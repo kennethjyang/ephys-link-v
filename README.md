@@ -30,33 +30,60 @@ Ephys Link's service is client agnostic (anyone can use its API), but is primari
 
 Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous requests, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients.
 
+Unlike Ephys Link v3, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications, which would be responsible for user interactions, are the ones that should encode user plans to the correct axes. This makes sense for Pinpoint V where the user can change coordinate system representation which can dramatically affect how axes map to manipulators.
+
 ## Client API
 
 Ephys Link creates a local HTTP server with the proper CORS configuration to enable another service to connect to it via a local IP. Similar to how [Vercel Serve](https://github.com/vercel/serve) creates a local file server accessible from any other client with access to the same network.
 
-There are two types of messages: a **request** and a **task**. **Requests** are handled through `GET` routes and are idempotent. **Tasks** are handled through `POST` routes and are expected to be long running (i.e. moving a manipulator to a pose).
+There are two types of messages: a **request** and a **task**. **Requests** are handled through `GET` routes and are idempotent. **Tasks** are handled through `PATCH` routes and are expected to be long running (i.e. moving a manipulator to a pose).
 
 ### `GET` Routes
 
+Idempotent information retrieval from the server.
+
 | Route | Example | Returns |
 | ----- | ------- | ------- |
-| `/version` | | Ephys Link version |
+| `/version` | | Ephys Link version. |
 | `/manipulators` | | An array with each manipulator's manufacturer and its ID (the manufacturer is its ID namespace). |
 | `/{manufacturer}/{ID}` | `/sensapex/3` | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
+| `/task/{ID}` | `/task/123e4567-e89b-12d3-a456-426614174000` | Polling endpoint for a task. Informs the state of the task or 404 if it's not running anymore. |
 
 #### Manipulator State
 
-The get route for a manipulator returns a lot of information about the manipulator.
+The `GET` route for a manipulator returns a lot of information about the manipulator.
 
 - Position
 - Orientation
-- If its moving.
+- If it's moving (i.e. actively in a task).
 - Number of axes.
 - Limits of each axes.
 
+#### Task State
 
-### `POST` Routes
+The `GET` route for a task allows client applications to poll it state and react accordingly.
 
-| Route | Input | Returns |
-| ----- | ----- | ------- |
-| `/stop` | | Stops all manipulator movement 
+- Time the task started.
+- List of manipulators involved.
+- Time the task ended.
+- Message (would be for reporting any errors).
+
+
+### `PATCH` Routes
+
+Actions on the manipulators.
+
+| Route | Example | Input | Description |
+| ----- | ------- | ----- | ------- |
+| `/stop_all` | | | Stops all manipulator movement (any ongoing tasks). |
+| `/stop/{manufacturer}/{ID}` | `/stop/sensapex/3` | | Stops a specific manipulator. |
+| `/set_position/{manufacturer}/{ID}` | `/set_position/sensapex/3` | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
+
+
+#### Task lifecycle
+
+Each patch returns a task ID (some UUID). Tasks create their entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `/task/{ID}` `GET` route for the state of the task.
+
+When a task is created, all ongoing tasks that use a manipulator in the current task is canceled. Every manipulator should only be in at most one ongoing task at a time. This implies running `/stop_all` will clear the ongoing task table by canceling everything.
+
+Tasks are set for removal once they stop (completion, error, or canceled). Their state message is set for errors or cancellation when they stop and then after a polling call is made (so something read it) they are deleted.
