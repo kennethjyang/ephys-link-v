@@ -1,2 +1,3 @@
-# ephys-link-v
+# Ephys Link
+
 Next-generation electrophysiology manipulator communication platform

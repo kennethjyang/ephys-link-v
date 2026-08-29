@@ -1,0 +1,12 @@
+pre-commit:
+  jobs:
+    - name: format
+      glob: "*.py"
+      run: uv run ruff format {staged_files}
+      stage_fixed: true
+    - name: lint
+      run: uv run ruff check
+      stage_fixed: true
+    - name: type-check
+      run: uv run pyrefly check
+      stage_fixed: true

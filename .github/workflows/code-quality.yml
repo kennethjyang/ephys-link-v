@@ -1,0 +1,48 @@
+name: Code Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 🛎 Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: 📦 Install ruff
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
+
+      - name: 📝 Format Code
+        run: ruff format --check
+
+      - name: 🔍 Lint Code
+        run: ruff check
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 🛎 Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: 🔭 Install UV
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+        with:
+          activate-environment: 'true'
+
+      - name: 🔄 Sync Dependencies
+        run: uv sync
+
+      - name: 🔍 Type Check
+        run: pyrefly check --output-format=github
