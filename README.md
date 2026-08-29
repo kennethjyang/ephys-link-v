@@ -28,9 +28,11 @@ Ephys Link's service is client agnostic (anyone can use its API), but is primari
 
 ## Architecture
 
-Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous requests, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients.
+Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous requests, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients. The server will recieve client messages, parse/validate them, and then execute the desired behavior. Instead of registering manipulators from the client, on startup all found manipulators have their bindings initialized and placed into a pool. From there the server endpoints will reach into the pool to execute the desired behavior. Bindings use a base class to enforce the correct shape and let the server run behaviors on a fixed API.
 
 Unlike Ephys Link v3, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications, which would be responsible for user interactions, are the ones that should encode user plans to the correct axes. This makes sense for Pinpoint V where the user can change coordinate system representation which can dramatically affect how axes map to manipulators.
+
+Another deviation from Ephys Link v3 is the removal of "inside brain" state. This is a responsibility of the client application. Ephys Link should only be a communication handler.
 
 ## Client API
 
@@ -56,8 +58,7 @@ The `GET` route for a manipulator returns a lot of information about the manipul
 - Position
 - Orientation
 - If it's moving (i.e. actively in a task).
-- Number of axes.
-- Limits of each axes.
+- Limits of each axes (the order is mapped to the native order of the platform's SDK and the number of values here indicate the number of axes).
 
 #### Task State
 
