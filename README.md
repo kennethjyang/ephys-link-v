@@ -1,3 +1,3 @@
 # Ephys Link
 
-Next-generation electrophysiology manipulator communication platform
+Electrophysiology manipulator communication platform
