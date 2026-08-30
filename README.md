@@ -53,13 +53,17 @@ Idempotent information retrieval from the server using `GET`.
 | `/version` | | Ephys Link version. |
 | `/manipulators` | | An array of all found manipulators. |
 | `/{make}/{ID}` | `/sensapex/3` | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
+| `/state[?ids={make:ID}]+` | `/state?ids=sensapex:3?ids=new-scale:A` | An array of manipulator states based on the request |
 | `/task/{ID}` | `/task/123e4567-e89b-12d3-a456-426614174000` | Polling endpoint for a task. Informs the state of the task or 404 if it's not running anymore. |
 
 #### Manipulators
 
+Details the information about a particular manipulator.
+
 - Make ("Sensapex")
 - Model ("uMp-4")
 - Platform specific ID ("3")
+- Limits of each axes (the order is mapped to the native order of the platform's SDK and the number of values here indicate the number of axes)
 - List of custom state fields
 - List of custom function signatures (object with name and list of parameters and their type)
 
@@ -72,17 +76,15 @@ Custom state and functionality is also documented here for client applications t
 
 #### Manipulator State
 
-- Make, model, ID
-- Position
-- Limits of each axes (the order is mapped to the native order of the platform's SDK and the number of values here indicate the number of axes)
+- Current position (in millimeters)
 - If it's moving (i.e. actively in a task)
 
 > [!IMPORTANT]
-> The contents of state information is dependent on the support of the platform.
->
-> For example New Scale has no concept of orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field.
+> All position units must be standardized to millimeters. Clients are expected to read and write in millimeters.
 
-Since this will be encoded as a JSON object in transit, additional custom fields can be added at the binding implementation. Pydantic type checking and model definitions will only validate against the required fields. Bindings should document these custom fields and share them with client applications via the `GET /manipulators` route.
+The contents of state information is dependent on the support of the platform. For example New Scale has no concept of orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field. Since this will be encoded as a JSON object in transit, additional custom fields can be added at the binding implementation. Pydantic type checking and model definitions will only validate against the required fields. Bindings should document these custom fields and share them with client applications via the `GET /manipulators` route.
+
+For clients that frequently request the state of multiple manipulators, they can use the `GET /state[?ids={make:ID}]+` to more efficiently get the state of multiple manipulators with one call.
 
 #### Task State
 

@@ -39,4 +39,12 @@ This setup has a lot of duplication with probes, so some refactoring may be usef
 
 ## Inspectors
 
-It should look a lot like the probe inspector. It will have an in-plane slice window at the top followed by the coordinate system fields to configure. Configuring the coordinate system values is essentially used to accurately orient the manipulator.
+It should look a lot like the probe inspector. It will have an in-plane slice window at the top followed by the coordinate system fields to configure. Configuring the coordinate system values is essentially used to accurately orient the manipulator. The fields that are attached to the manipulator should be disabled from user input but still displayed.
+
+The channel maps section should be split into probes and manipulators via the expansion component. Probes are still listed first.
+
+When a manipulator is added to an experiment, it does not have a probe set yet. At this point it's only visualized by the manipulator body geometry and all of the probe-centric inspector parts (in-plane slice, channel maps, probe body geometry, etc.) are all hidden. At the top of the inspector should be a probe type selector which will spawn the probe geometry. This is probe will have similar behavior to regular probes but is maintained separately by the manipulator system. The geometry is part of the same geometry group as the manipulator body (i.e. the selection outline layer highlights both the probe and the manipulator body).
+
+## Syncing Position
+
+Once a probe type is selected, its position will immediately be set by the manipulator state. The scene canvas will be responsible for updating the position. It will maintain a throttled poll of the `GET /state[?ids={make:ID}]+` route based on the manipulators in the experiment and update the state of manipulators. The desired polling behavior is to go as fast as possible up to the scene's update rate (i.e. wait for the previous result to come back and then send another request). The state route is used instead of the individual route to be more efficient. The _in vivo_ probe's position is computed using forward kinematics like regular probes and the position is updated in the scene.
