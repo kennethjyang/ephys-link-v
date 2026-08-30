@@ -84,7 +84,7 @@ Custom state and functionality is also documented here for client applications t
 
 The contents of state information is dependent on the support of the platform. For example New Scale has no concept of orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field. Since this will be encoded as a JSON object in transit, additional custom fields can be added at the binding implementation. Pydantic type checking and model definitions will only validate against the required fields. Bindings should document these custom fields and share them with client applications via the `GET /manipulators` route.
 
-For clients that frequently request the state of multiple manipulators, they can use the `GET /state[?ids={make:ID}]+` to more efficiently get the state of multiple manipulators with one call.
+For clients that frequently request the state of multiple manipulators, they can use the `GET /state[?ids={make:ID}]+` to more efficiently get the state of multiple manipulators with one call. If a manipulator's state is unavailable don't return its data (leave it missing). Client applications should understand this means there was a problem getting the manipulator's state (like a 404).
 
 #### Task State
 

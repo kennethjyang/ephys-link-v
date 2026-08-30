@@ -43,7 +43,7 @@ It should look a lot like the probe inspector. It will have an in-plane slice wi
 
 The channel maps section should be split into probes and manipulators via the expansion component. Probes are still listed first.
 
-When a manipulator is added to an experiment, it does not have a probe set yet. At this point it's only visualized by the manipulator body geometry and all of the probe-centric inspector parts (in-plane slice, channel maps, probe body geometry, etc.) are all hidden. At the top of the inspector should be a probe type selector which will spawn the probe geometry. This is probe will have similar behavior to regular probes but is maintained separately by the manipulator system. The geometry is part of the same geometry group as the manipulator body (i.e. the selection outline layer highlights both the probe and the manipulator body).
+When a manipulator is added to an experiment, it does not have a probe set yet. At this point it's only visualized by the manipulator body geometry and all the probe-centric inspector parts (in-plane slice, channel maps, probe body geometry, etc.) are all hidden. At the top of the inspector should be a probe type selector which will spawn the probe geometry. This is probe will have similar behavior to regular probes but is maintained separately by the manipulator system. The geometry is part of the same geometry group as the manipulator body (i.e. the selection outline layer highlights both the probe and the manipulator body).
 
 ## Syncing Position
 
