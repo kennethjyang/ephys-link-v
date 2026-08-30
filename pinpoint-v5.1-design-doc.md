@@ -62,3 +62,58 @@ If a requested manipulator state does not come back, that means there was a prob
 Keyboard controls can be used to send fire-and-forget movements. The inspector will have a large stop button in the control cluster at the top that appears during movements and can be used to stop probes.
 
 Positions are computed which results in the manipulator's positions and then they are transmitted using the `PATCH /set-position/{make}/{ID}` route. The task ID is added to the model and is used to poll for whether the movement is still ongoing or if something happened to it. A background polling task is spawned (something using `setInterval`) to watch the state of the task. On termination if it was completed successfully a success notification is shown (can be disabled in preferences) and the stop button is taken away. On error an error notification with the appropriate information is shown instead.
+
+## Automation
+
+> [!WARNING]
+> Implement this last. It builds on everything else.
+
+At the bottom of the manipulator section in the scene hierarchy, add a toggle to enable "Automation Mode". When enabled, all probes are changed to the shank-only visualization and locked (save what it was before so exiting this mode will revert it back to what it was before). All manipulators also have their configurations locked. For any manipulators that have not had their reference coordinate offsets calibrated, disable them in the hierarchy with a tooltip that explains only calibrated manipulators can be used in automation.
+
+When selecting a manipulator, an automation inspector is shown. It should be modeled after the regular manipulator inspector. At the top is the in-plane slice, followed by the coordinate system state (read only), and then the automation pipeline components.
+
+The automation pipeline has four sections:
+
+1. Target selection
+2. Entry coordinate drive
+3. Surface calibration
+3. Final depth drive
+4. Reset
+
+### Additions to the Manipulator State.
+
+To enable automation, the manipulator state needs to now also have the following state:
+
+- Selected target probe (ID)
+- Axis drive order (list of indices)
+- Entry coordinate distance
+- Entry coordinate drop on DV vs depth
+- Is moving flag
+- Movement speed (speed outside the brain)
+- Drive speed (speed inside the brain)
+- Proximity distance (when it should start slowing down as it reaches the target)
+- Proximity speed fraction (how much slower it should get; must be < 1)
+- Drive past distance
+- Return to surface drive speed fraction
+- Exit safety margin (how much further it should retract after the manipulator is supposedly outside of the brain)
+
+### Target Selection
+
+This segment is a dropdown with all probes that haven't been selected by a manipulator yet. The selection is clearable.
+
+When a target is selected, the entry coordinate segment is enabled.
+
+### Entry Coordinate
+
+After a target is selected, compute two entry coordinates: one located directly above the surface coordinate of the target on DV and the other along the probe axis. The user can edit the entry coordinate distance. Use a button toggle to switch between selecting the DV and the probe axis entry coordinates.
+
+Next is the planning of the trajectory there. Compute two options: one that follows the atlas axes (ML, AP, DV) and one that follows the manipulator's native axes. Break down the trajectory into steps that only edits one of these axes at a time. The user can select between these two trajectories using a toggle button and they can rearrange the order in which these axes are set. As part of the rearrangement of axes, users can also choose to _split_ the distance of an axes, to build a custom trajectory. So in the list of axes, there is a button to split (or delete a split). When there is a split a slider will appear with the total distance of the trajectory axis. The user can mode this slider to represent how far along in the trajectory this split will go. Subsequent splits will have their slider start where the last one left off so each slider will always represent the full distance of the axis. They all sum up to the total distance needed, but this splitting system will allow for custom movements along the axes. The trajectory plan is continuously computed based on the manipulator's position (throttled if needed).
+
+> [!NOTE]
+> A future implementation could consider using navigation to figure out the trajectory, but this version should use a highly specific and customizable trajectory planning system instead.
+
+Finally, to visualize the trajectory draw trajectory lines from the manipulator's _in vivo_ probe tip to the entry coordinate. These lines follow the order and length of the plan. Also show a semi-transparent plane that extends from the line up along the length of the shank to represent the space the probe sweeps. This plane can be hidden in the inspector. It is used to help visualize for collisions.
+
+Under this is a "Move" button to start the manipulator along this trajectory. While moving, the move button is replaced with a stop button.
+
+### Surface Calibration
