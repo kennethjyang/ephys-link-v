@@ -22,12 +22,6 @@ This is achieved through these design decisions:
 2. Stateless API: connections are ephemeral making crashes or disconnects meaningless.
 3. Minimal manipulator binding interface that also allows for custom features to be implemented.
 
-### Implementation
-
-Ephys Link is a Python _application_ meaning it is organized to be a standalone service and not a library installed via PyPI. Python is chosen for its extensive infrastructure and for ease-of-use. This will be useful for future contributing manufacturers to add bindings for their platform.
-
-The HTTP REST API is implemented via **FastAPI**. The data models are defined using **Pydantic**. Model and API JSON schemas can be exposed so client applications can build compatible interfaces.
-
 Ephys Link's service is client agnostic (anyone can use its API), but is primarily motivated to serve [Pinpoint V](https://github.com/AllenNeuralDynamics/pinpoint).
 
 ## Architecture
@@ -141,8 +135,25 @@ Custom platform-specific functions are called through duck typing and are identi
 
 ### Stopping logic
 
-Once manipulator movement is stopped, it is also removed from the task it was in. If it was the only manipulator in that task then the task is canceled.
+Once manipulator movement is stopped, it is also removed from the task it was in. If it was the only manipulator in that task then the task is canceled (don't actually remove the manipulator from the task in this case).
 
 ### Movement logic
 
-while updating the task as it does. It is possible for this to fail (unable to be fulfilled). This state should be reported in the task at the termination of the movement. 
+The task state should be updated with the progress of the moment. This means the binding should have some indication of whether the manipulator achieved the goal pose or if it was off. A goal pose that is not reached is considered a failure and should be reported as such.
+
+> [!IMPORTANT]
+> If the binding can determine that the movement is impossible it must terminate the movement early.
+
+## Code Organization and Implementation
+
+Ephys Link is a Python _application_ meaning it is organized to be a standalone service and not a library installed via PyPI. Python is chosen for its extensive infrastructure and for ease-of-use. This will be useful for future contributing manufacturers to add bindings for their platform.
+
+The HTTP REST API is implemented via **FastAPI**. The data models are defined using **Pydantic**. Model and API JSON schemas can be exposed so client applications can build compatible interfaces.
+
+Implementation should focus on idiomatic practices over high-performance tweaks.
+
+The program starts with the `main.py` script at the root of the repository with all other code organized under the `ephys_link` package (namespace). Standalone and singleton functionality should use module-level implementation. The bindings should inherit from be an abstract base class that enforces the required functions in the binding. Binding implementations should be located in the `ephys_link/bindings` package. Message models and other data models should be implemented under the `ephys_link/models` package. Models are grouped together by use (i.e. a `request_models.py` holds the request message models).
+
+All functions should aim to be pure (takes in inputs and returns outputs). This will make testing easier and help with the API pipeline structure. Binding functions should be pure where possible, however manipulator side effects is expected.
+
+All runtime errors should be caught to prevent permanent server crashes. Instead, error should be notified via the message response in tasks or the route feedback (if the error is at the route endpoint).
