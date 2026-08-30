@@ -35,6 +35,7 @@ The manipulator model encapsulates both the manipulator's state and information 
 - Coordinate system
 - Offset from reference coordinate
 - Active task ID (if any)
+- Movement speed (speed for setting its position)
 - Other probe states like the channel map and in-plane slice zoom, lock state (ignores user input), etc.
 
 This setup has a lot of duplication with probes, so some refactoring may be useful to extract commonly used functions. Manipulators and probe should have separately defined interfaces though (even if they copy each other).
@@ -59,7 +60,7 @@ If a requested manipulator state does not come back, that means there was a prob
 
 ## Setting Position
 
-Keyboard controls can be used to send fire-and-forget movements. The inspector will have a large stop button in the control cluster at the top that appears during movements and can be used to stop probes.
+Keyboard controls can be used to send fire-and-forget movements. The inspector will have a large stop button in the control cluster at the top that appears during movements and can be used to stop probes. There is also a speed input for how fast movements should go. At this stage there is not safety or speed reductions if the movement goes into the brain. If a movement increment looks like it will go into the brain, throw a warning notification in the top with a dismiss which will ignore the movement and a confirm button which will do the movement.
 
 Positions are computed which results in the manipulator's positions and then they are transmitted using the `PATCH /set-position/{make}/{ID}` route. The task ID is added to the model and is used to poll for whether the movement is still ongoing or if something happened to it. A background polling task is spawned (something using `setInterval`) to watch the state of the task. On termination if it was completed successfully a success notification is shown (can be disabled in preferences) and the stop button is taken away. On error an error notification with the appropriate information is shown instead.
 
@@ -86,22 +87,25 @@ To enable automation, the manipulator state needs to now also have the following
 
 - Selected target probe (ID)
 - Axis drive order (list of indices)
-- Entry coordinate distance
-- Entry coordinate drop on DV vs depth
+- Entry coordinate distance (default: 3 mm)
+- Entry coordinate drop on DV vs depth (default: depth)
 - Is moving flag
-- Movement speed (speed outside the brain)
-- Drive speed (speed inside the brain)
-- Proximity distance (when it should start slowing down as it reaches the target)
-- Proximity speed fraction (how much slower it should get; must be < 1)
-- Drive past distance
-- Return to surface drive speed fraction
-- Exit safety margin (how much further it should retract after the manipulator is supposedly outside of the brain)
+- Surface coordinate offset (for the _in vivo_ probe visualization)
+- Surface coordinate offset axis
+- Drive speed (speed inside the brain; default: 5 micrometers per second)
+- Proximity distance (when it should start slowing down as it reaches the target; default: 1 mm)
+- Proximity speed fraction (how much slower it should get; must be < 1; default: 2/3)
+- Drive past distance (default: 50 micrometers)
+- How long to wait at the drive past distance (default: 60 seconds)
+- Rested at drive past flag
+- Return to surface drive speed multiplier (default: 5)
+- Exit safety margin (how much further it should retract after the manipulator is supposedly outside of the brain; default: 100 micrometers)
 
 ### Target Selection
 
-This segment is a dropdown with all probes that haven't been selected by a manipulator yet. The selection is clearable.
+This segment is a dropdown with all probes that haven't been selected by a manipulator yet. The selection can be cleared.
 
-When a target is selected, the entry coordinate segment is enabled.
+When a target is selected, the entry coordinate panel is enabled.
 
 ### Entry Coordinate
 
@@ -116,4 +120,27 @@ Finally, to visualize the trajectory draw trajectory lines from the manipulator'
 
 Under this is a "Move" button to start the manipulator along this trajectory. While moving, the move button is replaced with a stop button.
 
+Once at the entry coordinate, the trajectory lines are removed the surface calibration panel is enabled.
+
 ### Surface Calibration
+
+Let the user manually move the probe to touch the surface. Then provide a button that does the same thing as the drop the surface button for probes (it will also show the DV/Depth choice arrows). Once surface calibration is one, the drive panel is enabled.
+
+### Depth Drive
+
+An arrow is drawn to show the trajectory from the manipulator's _in vivo_ probe tip to the drive past distance and then another arrow to show the movement back up to the target. The target location is also recalculated to be projected on the plane defined by the probe shank as the normal. This is to handle the case where the manipulator is moved slightly after going to the entry coordinate (so it is no longer exactly lined up along the probe's axis).
+
+Fields are available to edit the remaining settings/states. The base speed is edited first with a dropdown containing the common safe speed options (1, 3, 5, 10 micrometers per second) and then the option to type in a custom one. The proximity and retraction speed fractions are regular number inputs with default values.
+
+A drive is moving only on one manipulator axis (the drive axes) from the surface to the proximity distance, to the drive past distance, back up to the target, and then finally retracting to the surface after the recording. Once it has reached the drive past distance _and waited there for the required time_ it can mark the flag that it has done so.
+
+At the bottom is the "Drive" button to start the movement. While moving, the button is replaced with a stop button. When stopped after a drive has started, a "resume" button will continue the drive path from the manipulator's current location and an "retract" button will start to pull the probe back up. Notably, if the drive past rest flag has not been set, any drive movement must go back to that point to complete it.
+
+Once at the drive target, the retract panel is enabled.
+
+### Retract
+
+Once the experiment is done, the retract button pulls the probe back up to the surface and then to the entry coordinate. The retract button swaps with a stop button that pauses the movement.
+
+> [!IMPORTANT]
+> At this stage, there is no safety checks for going back and trying to change a previous step. Users are responsible for the safety and correctness of their movement through the automation pipeline.
