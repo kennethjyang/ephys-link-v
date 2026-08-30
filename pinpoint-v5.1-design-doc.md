@@ -30,9 +30,11 @@ The manipulator model encapsulates both the manipulator's state and information 
 
 - Source (Ephys Link address)
 - Info object from the `GET /manipualtors` route
-- State object from the last `GET /{make}/{ID}`
+- State object from the last poll
 - _in vivo_ probe type
 - Coordinate system
+- Offset from reference coordinate
+- Active task ID (if any)
 - Other probe states like the channel map and in-plane slice zoom, lock state (ignores user input), etc.
 
 This setup has a lot of duplication with probes, so some refactoring may be useful to extract commonly used functions. Manipulators and probe should have separately defined interfaces though (even if they copy each other).
@@ -40,6 +42,8 @@ This setup has a lot of duplication with probes, so some refactoring may be usef
 ## Inspectors
 
 It should look a lot like the probe inspector. It will have an in-plane slice window at the top followed by the coordinate system fields to configure. Configuring the coordinate system values is essentially used to accurately orient the manipulator. The fields that are attached to the manipulator should be disabled from user input but still displayed.
+
+An addition field above the coordinate system section is added to manage the offset to the reference coordinate. A button can be used to use the current position of the manipulator as the offset. This information should be pulled directly using the `GET /{make}/{ID}`.
 
 The channel maps section should be split into probes and manipulators via the expansion component. Probes are still listed first.
 
@@ -52,3 +56,9 @@ During a disconnection from Ephys Link, the interface should be disabled (but no
 Once a probe type is selected, its position will immediately be owned and set by the manipulator state. The scene canvas will be responsible for updating the position. It will maintain a throttled poll of the `GET /state[?ids={make:ID}]+` route based on the manipulators in the experiment and update the state of manipulators. The desired polling behavior is to go as fast as possible up to the scene's update rate (i.e. wait for the previous result to come back and then send another request). The state route is used instead of the individual route to be more efficient. The _in vivo_ probe's position is computed using forward kinematics like regular probes and the position is updated in the scene.
 
 If a requested manipulator state does not come back, that means there was a problem getting it. Disable real-time polling until the user presses the reconnect button.
+
+## Setting Position
+
+Keyboard controls can be used to send fire-and-forget movements. The inspector will have a large stop button in the control cluster at the top that appears during movements and can be used to stop probes.
+
+Positions are computed which results in the manipulator's positions and then they are transmitted using the `PATCH /set-position/{make}/{ID}` route. The task ID is added to the model and is used to poll for whether the movement is still ongoing or if something happened to it. A background polling task is spawned (something using `setInterval`) to watch the state of the task. On termination if it was completed successfully a success notification is shown (can be disabled in preferences) and the stop button is taken away. On error an error notification with the appropriate information is shown instead.
