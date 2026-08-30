@@ -10,7 +10,7 @@ Electrophysiology manipulator communication platform.
 
 # Design Doc
 
-Ephys Link V is a modern overhaul of [Ephys Link v3](https://github.com/VirtualBrainLab/ephys-link). This design doc is meant for humans and LLMs to read.
+Ephys Link V is a modern overhaul of [Ephys Link v2](https://github.com/VirtualBrainLab/ephys-link). This design doc is meant for humans and LLMs to read.
 
 ## Goals
 
@@ -29,9 +29,9 @@ Ephys Link's service is client agnostic (anyone can use its API), but is primari
 Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous messages, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients. The server will receive client messages, parse/validate them, and then execute the desired behavior. Instead of registering manipulators from the client, on startup all found manipulators will have their bindings initialized and placed into a pool. From there the server endpoints will reach into that pool to execute the desired behavior. Bindings use a base class to enforce the correct shape and let the server run behaviors on a fixed API.
 
 > [!NOTE]
-> Unlike Ephys Link v3, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications are the ones that should encode user plans to the correct axes for manipulators. This makes sense for Pinpoint V where the user can change coordinate system representation and have custom mappings between planning axes and manipulator axes.
+> Unlike Ephys Link v2, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications are the ones that should encode user plans to the correct axes for manipulators. This makes sense for Pinpoint V where the user can change coordinate system representation and have custom mappings between planning axes and manipulator axes.
 >
-> Another deviation from Ephys Link v3 is the removal of "inside brain" state. This is a responsibility of the client application. Ephys Link should only be a communication handler.
+> Another deviation from Ephys Link v2 is the removal of "inside brain" state. This is a responsibility of the client application. Ephys Link should only be a communication handler.
 
 ## Client API
 
