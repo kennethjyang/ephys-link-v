@@ -42,6 +42,8 @@ There are two types of messages: a **request** and a **task**.
 - **Requests** are handled through `GET` routes and are idempotent.
 - **Tasks** are handled through `PATCH` routes and are expected to be long running (i.e. moving a manipulator to a pose).
 
+The FastAPI system will handle type checking and validation for inbound messages. The endpoints route to the bindings or provide an immediate response where applicable.
+
 ### Requests
 
 Idempotent information retrieval from the server using `GET`.
