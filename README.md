@@ -106,7 +106,7 @@ Actions on the manipulators via `PATCH` routes.
 | `/custom/{make}/{ID}` | `/custom/sensapex/3` | Arbitrary object. | Calls a custom command matched with duck typing. |
 
 
-#### Task lifecycle
+#### Task Lifecycle
 
 Each `PATCH` returns a task ID (some UUID). Tasks first add an entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `GET /task/{ID}` route for the state of the task.
 
@@ -129,17 +129,17 @@ Once messages are validated through the client API, the desired manipulator beha
 | `set_position` | Manipulator and pose | Triggers movement and updates task. | Attempts to move the manipulator into the desired pose. |
 
 
-### Custom state and behavior
+### Custom State and Behavior
 
 Current state has required fields to return but additional custom state information can be added as additional fields. It's all JSON encoded at the end of the day. Bindings should document these additional fields for client applications to read.
 
 Custom platform-specific functions are called through duck typing and are identified by the function name and arguments as passed in a generic object by the `PATCH /custom/{make}/{ID}` route. For example, Sensapex has a custom "jackhammer mode" with special instructions that can be passed via this custom command.
 
-### Stopping logic
+### Stopping Logic
 
 Once manipulator movement is stopped, it is also removed from the task it was in. If it was the only manipulator in that task then the task is canceled (don't actually remove the manipulator from the task in this case).
 
-### Movement logic
+### Movement Logic
 
 The task state should be updated with the progress of the moment. This means the binding should have some indication of whether the manipulator achieved the goal pose or if it was off. A goal pose that is not reached is considered a failure and should be reported as such.
 
