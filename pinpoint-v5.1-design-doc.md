@@ -5,7 +5,7 @@ Pinpoint V (v5.1) will reintroduce electrophysiology manipulator integration for
 ## Goals
 
 - Manipulator should be a first-class entity like probes and is a distinct concept from them.
-- Manipulators bodies should be visualized in the scene with both 3D models if given or by proxy geometry (like cubes). They don't need to animate, just show where they are.
+- Manipulators bodies should be visualized in the scene with 3D models if given or by proxy geometry (like cubes). They don't need to animate, just show where they are.
 - Manipulators will control visualizations of _in vivo_ probes. These are like regular probes but are not user controlled and are attached to the manipulator (not part of the probe hierarchy).
 - Users can control manipulators through Pinpoint's interface. This can be done by driving the translation stages directly or by trajectory planning and automation.
 
@@ -16,7 +16,7 @@ Manipulators are a first-class entity meaning they get their own section in the 
 > [!NOTE]
 > Manipulators from different Ephys Links instances can be added to the same experiment.
 
-Connections to Ephys Link are ephemeral. If a connection is unable to be established when something needs to happen, show a connection error notification but don't remove the manipulator or the setup. Instead, show it is "disconnected" and provide a reconnect button to try connecting again. This will try using `GET /manipulators` to a) check for a connection to Ephys Link and b) check for the manipulator's existence.
+Connections to Ephys Link are ephemeral. If a connection is unable to be established when something needs to happen, show a connection error notification but don't remove the manipulator or the setup. Instead, show it is "disconnected" and provide a reconnect button to try connecting again. This will try using `GET /manipulators` to a) check for a connection to Ephys Link and b) check for the manipulator's existence. This essentially creates a connection error handling loop where any connection-related errors from Ephys Link will disable the manipulator and the user can use the button to reestablish connection and resume until another connection error happens again.
 
 ## Coordinate System Update
 
@@ -45,6 +45,10 @@ The channel maps section should be split into probes and manipulators via the ex
 
 When a manipulator is added to an experiment, it does not have a probe set yet. At this point it's only visualized by the manipulator body geometry and all the probe-centric inspector parts (in-plane slice, channel maps, probe body geometry, etc.) are all hidden. At the top of the inspector should be a probe type selector which will spawn the probe geometry. This is probe will have similar behavior to regular probes but is maintained separately by the manipulator system. The geometry is part of the same geometry group as the manipulator body (i.e. the selection outline layer highlights both the probe and the manipulator body).
 
+During a disconnection from Ephys Link, the interface should be disabled (but not hidden) except for a reconnect button at the top.
+
 ## Syncing Position
 
-Once a probe type is selected, its position will immediately be set by the manipulator state. The scene canvas will be responsible for updating the position. It will maintain a throttled poll of the `GET /state[?ids={make:ID}]+` route based on the manipulators in the experiment and update the state of manipulators. The desired polling behavior is to go as fast as possible up to the scene's update rate (i.e. wait for the previous result to come back and then send another request). The state route is used instead of the individual route to be more efficient. The _in vivo_ probe's position is computed using forward kinematics like regular probes and the position is updated in the scene.
+Once a probe type is selected, its position will immediately be owned and set by the manipulator state. The scene canvas will be responsible for updating the position. It will maintain a throttled poll of the `GET /state[?ids={make:ID}]+` route based on the manipulators in the experiment and update the state of manipulators. The desired polling behavior is to go as fast as possible up to the scene's update rate (i.e. wait for the previous result to come back and then send another request). The state route is used instead of the individual route to be more efficient. The _in vivo_ probe's position is computed using forward kinematics like regular probes and the position is updated in the scene.
+
+If a requested manipulator state does not come back, that means there was a problem getting it. Disable real-time polling until the user presses the reconnect button.
