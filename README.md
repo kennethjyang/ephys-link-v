@@ -20,21 +20,24 @@ This is achieved through these design decisions:
 
 1. HTTP REST API: very basic communication protocol that does not require additional dependencies for most platforms.
 2. Stateless API: connections are ephemeral making crashes or disconnects meaningless.
-3. Enforceable "minimum" manipulator binding interface that allows for custom features to be access outside of the standard API.
+3. Minimal manipulator binding interface that also allows for custom features to be implemented.
 
-Ephys Link is a Python _application_ meaning it is organized to be a standalone service and not a library installed via PyPI. Python is chosen for the extensive infrastructure and for ease-of-use (especially for future manufacturers to add bindings for their platform).
+### Implementation
 
-The HTTP REST API is defined via a FastAPI. The data models types are defined using Pydantic. Model and API JSON schemas can be exposed so client applications can build compatible interfaces.
+Ephys Link is a Python _application_ meaning it is organized to be a standalone service and not a library installed via PyPI. Python is chosen for its extensive infrastructure and for ease-of-use. This will be useful for future contributing manufacturers to add bindings for their platform.
+
+The HTTP REST API is implemented via **FastAPI**. The data models are defined using **Pydantic**. Model and API JSON schemas can be exposed so client applications can build compatible interfaces.
 
 Ephys Link's service is client agnostic (anyone can use its API), but is primarily motivated to serve [Pinpoint V](https://github.com/AllenNeuralDynamics/pinpoint).
 
 ## Architecture
 
-Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous messages, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients. The server will receive client messages, parse/validate them, and then execute the desired behavior. Instead of registering manipulators from the client, on startup all found manipulators have their bindings initialized and placed into a pool. From there the server endpoints will reach into the pool to execute the desired behavior. Bindings use a base class to enforce the correct shape and let the server run behaviors on a fixed API.
+Ephys Link is organized a lot like a database service. There is a client-facing API that is stateless and allows for idempotent access and asynchronous messages, and there is a stateful backend that maintains connections to the manipulators and fulfills requests from clients. The server will receive client messages, parse/validate them, and then execute the desired behavior. Instead of registering manipulators from the client, on startup all found manipulators will have their bindings initialized and placed into a pool. From there the server endpoints will reach into that pool to execute the desired behavior. Bindings use a base class to enforce the correct shape and let the server run behaviors on a fixed API.
 
-Unlike Ephys Link v3, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications, which would be responsible for user interactions, are the ones that should encode user plans to the correct axes. This makes sense for Pinpoint V where the user can change coordinate system representation which can dramatically affect how axes map to manipulators.
-
-Another deviation from Ephys Link v3 is the removal of "inside brain" state. This is a responsibility of the client application. Ephys Link should only be a communication handler.
+> [!NOTE]
+> Unlike Ephys Link v3, Ephys Link V does not enforce a "unified coordinate system". Instead, it transparently maps input values in the order they are given to the XYZ+ coordinates in the platform's SDK directly. Client applications are the ones that should encode user plans to the correct axes for manipulators. This makes sense for Pinpoint V where the user can change coordinate system representation and have custom mappings between planning axes and manipulator axes.
+>
+> Another deviation from Ephys Link v3 is the removal of "inside brain" state. This is a responsibility of the client application. Ephys Link should only be a communication handler.
 
 ## Client API
 
@@ -45,66 +48,101 @@ There are two types of messages: a **request** and a **task**.
 - **Requests** are handled through `GET` routes and are idempotent.
 - **Tasks** are handled through `PATCH` routes and are expected to be long running (i.e. moving a manipulator to a pose).
 
-### `GET` Routes
+### Requests
 
-Idempotent information retrieval from the server.
+Idempotent information retrieval from the server using `GET`.
 
 | Route | Example | Returns |
 | ----- | ------- | ------- |
 | `/version` | | Ephys Link version. |
-| `/manipulators` | | An array with each manipulator's manufacturer and its ID (the manufacturer is its ID namespace). |
-| `/{manufacturer}/{ID}` | `/sensapex/3` | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
+| `/manipulators` | | An array of all found manipulators. |
+| `/{make}/{ID}` | `/sensapex/3` | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
 | `/task/{ID}` | `/task/123e4567-e89b-12d3-a456-426614174000` | Polling endpoint for a task. Informs the state of the task or 404 if it's not running anymore. |
+
+#### Manipulators
+
+- Make ("Sensapex")
+- Model ("uMp-4")
+- Platform specific ID ("3")
+- List of custom state fields
+- List of custom function signatures (object with name and list of parameters and their type)
+
+Reports the known manipulators by their make ("Sensapex"), model ("uMp-4"), and platform specific ID ("3"). Clients can use this to show a list of available manipulators to use. This information will be converted to kebab-case when used in routes.
+
+> [!IMPORTANT]
+> Manipulator ID's are expected to be unique within their make namespace.
+
+Custom state and functionality is also documented here for client applications to read.
 
 #### Manipulator State
 
-The `GET` route for a manipulator returns a lot of information about the manipulator.
-
+- Make, model, ID
 - Position
-- Orientation
-- If it's moving (i.e. actively in a task).
-- Limits of each axes (the order is mapped to the native order of the platform's SDK and the number of values here indicate the number of axes).
+- Limits of each axes (the order is mapped to the native order of the platform's SDK and the number of values here indicate the number of axes)
+- If it's moving (i.e. actively in a task)
 
-Since this will essentially be encoded as a JSON object in transit, additional fields can be added at the binding implementation. Pydantic type checking and model definitions will only validate against the required fields.
+> [!IMPORTANT]
+> The contents of state information is dependent on the support of the platform.
+>
+> For example New Scale has no concept of orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field.
+
+Since this will be encoded as a JSON object in transit, additional custom fields can be added at the binding implementation. Pydantic type checking and model definitions will only validate against the required fields. Bindings should document these custom fields and share them with client applications via the `GET /manipulators` route.
 
 #### Task State
 
-The `GET` route for a task allows client applications to poll it state and react accordingly.
+- Time the task started
+- List of manipulators involved
+- Time the task ended
+- Message (would be for reporting any errors)
 
-- Time the task started.
-- List of manipulators involved.
-- Time the task ended.
-- Message (would be for reporting any errors).
+The end time indicates if the task is still ongoing. It will be `null` while ongoing and then have a real value when done. The message field will describe the termination state (i.e. "Canceled").
 
 
-### `PATCH` Routes
+### Tasks
 
-Actions on the manipulators.
+Actions on the manipulators via `PATCH` routes.
 
 | Route | Example | Input | Description |
 | ----- | ------- | ----- | ------- |
 | `/stop_all` | | | Stops all manipulator movement (any ongoing tasks). |
-| `/stop/{manufacturer}/{ID}` | `/stop/sensapex/3` | | Stops a specific manipulator. |
-| `/set_position/{manufacturer}/{ID}` | `/set_position/sensapex/3` | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
-| `/custom/{manufacturer}/{ID}` | `/custom/sensapex/3` | Arbitrary object. | Calls a custom command. |
+| `/stop/{make}/{ID}` | `/stop/sensapex/3` | | Stops a specific manipulator. |
+| `/set-position/{make}/{ID}` | `/set-position/sensapex/3` | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
+| `/custom/{make}/{ID}` | `/custom/sensapex/3` | Arbitrary object. | Calls a custom command matched with duck typing. |
 
 
 #### Task lifecycle
 
-Each `PATCH` returns a task ID (some UUID). Tasks first add an entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `/task/{ID}` `GET` route for the state of the task.
+Each `PATCH` returns a task ID (some UUID). Tasks first add an entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `GET /task/{ID}` route for the state of the task.
 
-When a task is created, all ongoing tasks that use a manipulator in the current task is canceled. Every manipulator should only be in at most one ongoing task at a time. This implies running `/stop_all` will move all ongoing tasks to canceled.
+When a task is created, all ongoing tasks that use a manipulator in the current task is canceled. This implies running `/stop_all` will set all ongoing tasks to the canceled state (has an end time).
+
+> [!IMPORTANT]
+> Every manipulator should only be in **at most one** ongoing task at a time.
 
 Tasks are set for removal once they stop (completion, error, or canceled). Their state message is set for errors or cancellation when they stop and then after a polling call is made (so someone read it) they are deleted from the task pool.
 
 ## Manipulator Binding Interface
 
-Once messages are validated through the client API, the desired manipulator behavior is passed to the binding system. A base interface is defined to ensure the required commands have bindings, however bindings can have more functions that are name-mapped for the cusotm `PATCH` route.
+Once messages are validated through the client API, the desired manipulator behavior is passed to the binding system. A base interface is defined to ensure the required commands have bindings, however bindings can have more functions that are name-mapped for the custom `PATCH` route. A separate binding does not necessarily need to be made for each model of a manufacturer. For example, Sensapex uMp-4 and uMp-3 can be accessed via the same SDK so they only need one manipulator binding.
 
 | Function | Inputs | Outputs | Description |
 | -------- | ------ | ------- | ----------- |
-| `current_state` | Manipulator to pull data for. | Manipulator state object. Includes custom state values after required ones. | Response for `GET /{manipulator}/{ID}` |
-| `stop` | Manipulator to stop. | Updates task. | Stop a specific manipulator's movement. Cancels all tasks it is the sole manipulator in and removes itself from those tasks (so the non-canceled manipulator is the only manipulator remaining). Does not cancel otherwise. |
-| `stop_all` | | Updates tasks. | Calls `stop` on all manipulators in this manufacturer. |
-| `set_position` | Manipulator and pose | Triggers movement and updates task as it does | Attempts to move the manipulator into the desired pose while updating the task as it does. It is possible for this to fail (unable to be fulfilled). This state should be reported in the task at the termination of the movement. |
+| `current_state` | Manipulator to pull data for. | Manipulator state object. | Response for `GET /{make}/{ID}` |
+| `stop` | Manipulator to stop. | Stops manipulator movement and updates task. | Stop a specific manipulator's movement. |
+| `stop_all` | | Stops all manipulators in this binding and updates tasks. | Calls `stop` on all manipulators in this binding. |
+| `set_position` | Manipulator and pose | Triggers movement and updates task. | Attempts to move the manipulator into the desired pose. |
 
+
+### Custom state and behavior
+
+Current state has required fields to return but additional custom state information can be added as additional fields. It's all JSON encoded at the end of the day. Bindings should document these additional fields for client applications to read.
+
+Custom platform-specific functions are called through duck typing and are identified by the function name and arguments as passed in a generic object by the `PATCH /custom/{make}/{ID}` route. For example, Sensapex has a custom "jackhammer mode" with special instructions that can be passed via this custom command.
+
+### Stopping logic
+
+Once manipulator movement is stopped, it is also removed from the task it was in. If it was the only manipulator in that task then the task is canceled.
+
+### Movement logic
+
+while updating the task as it does. It is possible for this to fail (unable to be fulfilled). This state should be reported in the task at the termination of the movement. 
