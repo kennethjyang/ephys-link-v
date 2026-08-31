@@ -151,6 +151,14 @@ The task state should be updated with the progress of the moment. This means the
 > [!IMPORTANT]
 > If the binding can determine that the movement is impossible, it must terminate the movement early.
 
+## User Interface
+
+Ephys Link no longer needs a GUI or practically any interaction to run. Optionally expose the server's port number as a command line argument, but it is not necessary to set.
+
+## Distribution
+
+Ephys Link is a standalone application. Use PyInstaller to build it into a self-contained executable for the desired platform. This likely means Windows as this is the most common OS used on rig computers. 
+
 ## Code Organization and Implementation
 
 Ephys Link is a Python _application_, meaning it is organized to be a standalone service and not a library installed via PyPI. Python is chosen for its extensive infrastructure and for ease of use. This will be useful for future contributing manufacturers to add bindings for their platform.
