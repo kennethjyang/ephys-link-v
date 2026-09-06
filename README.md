@@ -40,10 +40,10 @@ Ephys Link creates a local HTTP server with the proper CORS configuration to ena
 There are two types of messages: a **request** and a **task**.
 
 - **Requests** are handled through `GET` routes and are idempotent.
-- **Tasks** are handled through `PATCH` routes and are expected to be long-running (i.e., moving a manipulator to a pose).
+- **Tasks** are handled through `PUT` routes and are expected to be long-running (i.e., moving a manipulator to a pose).
 
 > [!TIP]
-> `PATCH` is used instead of `PUT` since all routes _mutate_ manipulator state rather than _replace_ the manipulator state/object.
+> `PUT` is used instead of `POST` or `PATCH` since all routes modify the _entire_ manipulator state (which is really just position) rather than _add_ a manipulator state/object (`POST`) or mutate a portion of it (`PATCH`).
 
 The FastAPI system will handle type checking and validation for inbound messages. The endpoints route to the bindings or provide an immediate response where applicable.
 
@@ -100,7 +100,7 @@ The end time indicates if the task is still ongoing. It will be `null` while ong
 
 ### Tasks
 
-Actions on the manipulators via `PATCH` routes.
+Actions on the manipulators via `PUT` routes.
 
 | Route | Example | Input | Description |
 | ----- | ------- | ----- | ------- |
@@ -112,7 +112,7 @@ Actions on the manipulators via `PATCH` routes.
 
 #### Task Lifecycle
 
-Each `PATCH` returns a task ID (some UUID). Tasks first add an entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `GET /task/{ID}` route for the state of the task.
+Each `PUT` returns a task ID (some UUID). Tasks first add an entry into the task table with the list of manipulators involved. The message field can be updated as the task is being fulfilled. Clients poll the `GET /task/{ID}` route for the state of the task.
 
 When a task is created, all ongoing tasks that use a manipulator in the current task are canceled. This implies that running `/stop_all` will set all ongoing tasks to the canceled state (has an end time).
 
@@ -123,7 +123,7 @@ Tasks are set for removal once they stop (completion, error, or canceled). Their
 
 ## Manipulator Binding Interface
 
-Once messages are validated through the client API, the desired manipulator behavior is passed to the binding system. A base interface is defined to ensure the required commands have bindings; however, bindings can have more functions that are name-mapped for the custom `PATCH` route. A separate binding does not necessarily need to be made for each model of a manufacturer. For example, Sensapex uMp-4 and uMp-3 can be accessed via the same SDK, so they only need one manipulator binding.
+Once messages are validated through the client API, the desired manipulator behavior is passed to the binding system. A base interface is defined to ensure the required commands have bindings; however, bindings can have more functions that are name-mapped for the custom `PUT` route. A separate binding does not necessarily need to be made for each model of a manufacturer. For example, Sensapex uMp-4 and uMp-3 can be accessed via the same SDK, so they only need one manipulator binding.
 
 | Function | Inputs | Outputs | Description |
 | -------- | ------ | ------- | ----------- |
@@ -137,7 +137,7 @@ Once messages are validated through the client API, the desired manipulator beha
 
 The current state has required fields to return, but additional custom state information can be added as additional fields. It's all JSON encoded at the end of the day. Bindings should document these additional fields for client applications to read.
 
-Custom platform-specific functions are called through duck typing and are identified by the function name and arguments as passed in a generic object by the `PATCH /custom/{make}/{ID}` route. For example, Sensapex has a custom "jackhammer mode" with special instructions that can be passed via this custom command.
+Custom platform-specific functions are called through duck typing and are identified by the function name and arguments as passed in a generic object by the `PUT /custom/{make}/{ID}` route. For example, Sensapex has a custom "jackhammer mode" with special instructions that can be passed via this custom command.
 
 ### Stopping Logic
 
@@ -152,11 +152,11 @@ The task state should be updated with the progress of the moment. This means the
 
 ## User Interface
 
-Ephys Link no longer needs a GUI or practically any interaction to run. Optionally expose the server's port number as a command line argument, but it is not necessary to set.
+Ephys Link no longer needs a GUI or practically any interaction to run. Optionally expose the server's port number as a command-line argument, but it is not necessary to set.
 
 ## Distribution
 
-Ephys Link is a standalone application. Use PyInstaller to build it into a self-contained executable for the desired platform. This likely means Windows as this is the most common OS used on rig computers. 
+Ephys Link is a standalone application. Use PyInstaller to build it into a self-contained executable for the desired platform. This likely means Windows, as this is the most common OS used on rig computers. 
 
 ## Code Organization and Implementation
 
