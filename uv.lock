@@ -175,6 +175,7 @@ version = "5.1.0.dev1"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "pydantic" },
     { name = "uvicorn" },
 ]
 
@@ -190,8 +191,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
-    { name = "uvicorn", specifier = ">=0.52.4" },
+    { name = "fastapi", extras = ["standard"], specifier = "==0.141.1" },
+    { name = "pydantic", specifier = "==2.13.5" },
+    { name = "uvicorn", specifier = "==0.52.4" },
 ]
 
 [package.metadata.requires-dev]
