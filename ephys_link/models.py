@@ -1,6 +1,12 @@
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 
@@ -25,9 +31,51 @@ class ManipulatorInfo(CamelModel):
     make: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
     id: Annotated[str, Field(min_length=1)]
-    axis_limits: Annotated[list[tuple[float, float]], Field(min_length=1)]
+    axis_limits: Annotated[
+        list[tuple[float, float]],
+        Field(min_length=1),
+    ]
     custom_properties: list[str]
     custom_functions: dict[str, list[str]]
+
+    # noinspection nested-decorators
+    @field_validator("axis_limits")
+    @classmethod
+    def validate_range_ascending(
+        cls,
+        value: list[tuple[float, float]],
+    ) -> list[tuple[float, float]]:
+        for pair in value:
+            if pair[1] <= pair[0]:
+                raise ValueError(f"Pair {pair} is an invalid range.")
+        return value
+
+
+class TaskState(CamelModel):
+    """State of a manipulator task.
+
+    Args:
+        time_started: Time stamp of when the task was created (in seconds).
+        manipulators: Make-ID pairs of manipulators involved.
+        time_ended: Time stamp of when the task was ended (in seconds). Is None when unfinished.
+        message: Progress and any reports for clients. Can be empty, but not None.
+    """
+
+    time_started: Annotated[float, Field(gt=0)]
+    manipulators: list[tuple[str, str]]
+    time_ended: Annotated[float | None, Field(None, gt=0)]
+    message: str = ""
+
+    @model_validator(mode="after")
+    def validate_time_stamp(self) -> Self:
+        if self.time_ended is None:
+            return self
+        if self.time_ended < self.time_started:
+            raise ValueError(
+                f"Time stamp cannot have ended ({self.time_ended}) before it started ({self.time_started})."
+            )
+
+        return self
 
 
 class ServerStateResponse(CamelModel):
