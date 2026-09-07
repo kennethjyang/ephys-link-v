@@ -26,3 +26,12 @@ class ServerStateResponse(CamelModel):
 
     server_version: str
     manipulators: list[Manipulator]
+
+
+class ManipulatorStateResponse(CamelModel):
+    """Individual manipulator state response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    position: Annotated[list[float], Field(min_length=1)]
+    is_moving: bool
