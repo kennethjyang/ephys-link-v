@@ -20,6 +20,9 @@ testpaths = ["tests"]
 [tool.ruff]
 fix = true
 
+[tool.ruff.lint]
+ignore = ["BLE001"]
+
 [tool.pyrefly]
 project-includes = [
     "**/*.py*",
