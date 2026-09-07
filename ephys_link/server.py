@@ -8,7 +8,14 @@ app = FastAPI()
 
 @app.get("/")
 async def server_state() -> ServerStateResponse:
-    return ServerStateResponse(server_version="5.1.0-dev1", manipulators=[])
+    return ServerStateResponse(
+        server_version="5.1.0-dev1",
+        manipulators=[
+            manipulator.info()
+            for make in manipulators.values()
+            for manipulator in make.values()
+        ],
+    )
 
 
 @app.get("/{make}/{manipulator_id}")
