@@ -5,7 +5,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.params import Query
 
 from ephys_link.manipulators import manipulators
-from ephys_link.models import ManipulatorStateResponse, ServerStateResponse
+from ephys_link.models import ManipulatorStateResponse, ServerStateResponse, TaskState
+from ephys_link.tasks import tasks
 
 app = FastAPI()
 
@@ -24,6 +25,14 @@ async def server_state() -> ServerStateResponse:
 
 @app.get("/{make}/{manipulator_id}")
 async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
+    """Query the state of a manipulator.
+
+    Args:
+        make: Manufacturer of the manipulator in kebab-case
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+    Returns:
+        Manipulator state or 404 if the manipulator wasn't found at startup and 503 if there was a problem getting the state.
+    """
     try:
         return await manipulators[make][manipulator_id].state()
     except KeyError:
@@ -42,9 +51,45 @@ async def manipulator_states(
         list[str], Query(alias="manipulator", min_length=1)
     ],
 ) -> dict[str, dict[str, ManipulatorStateResponse]]:
+    """Query the state of multiple manipulators.
+
+    Args:
+        manipulators_requested: List of manipulators to query formatted as "{make}/{manipulator_id}".
+    Returns:
+        Nested object with each manipulator's state requested in Make -> ID -> State format.
+        Will immediately terminate with 404 or 503 if there was a problem getting a state.
+        Will return 400 if the identifier pair was malformed.
+    """
     response = defaultdict(dict)
     for manipulator in manipulators_requested:
-        make, manipulator_id = manipulator.split("/")
-        response[make][manipulator_id] = await manipulator_state(make, manipulator_id)
+        try:
+            make, manipulator_id = manipulator.split("/")
+            response[make][manipulator_id] = await manipulator_state(
+                make, manipulator_id
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f'Malformed manipulator identifier pair "{manipulator}"',
+            )
 
     return dict(response)
+
+
+@app.get("/task/{task_id}")
+def task_state(task_id: str) -> TaskState:
+    """Retrieves the state of a task.
+
+    Args:
+        task_id: Task ID.
+    Returns:
+        Task state or 404 if the task doesn't exist, 503 if there was a problem getting the task.
+    """
+    try:
+        return tasks[task_id]
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    except Exception:
+        raise HTTPException(
+            status_code=503, detail=f"Task {task_id} could not be retrieved"
+        )
