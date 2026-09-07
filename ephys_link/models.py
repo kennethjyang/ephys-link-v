@@ -33,5 +33,8 @@ class ManipulatorStateResponse(CamelModel):
 
     model_config = ConfigDict(extra="allow")
 
+    # In mm.
     position: Annotated[list[float], Field(min_length=1)]
+
+    # True = there is an _active_ task this manipulator is in.
     is_moving: bool

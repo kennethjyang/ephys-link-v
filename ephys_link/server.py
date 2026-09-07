@@ -12,12 +12,13 @@ async def server_state() -> ServerStateResponse:
 
 
 @app.get("/{make}/{manipulator_id}")
-async def manipulator_state(make: str, manipulator_id: int) -> ManipulatorStateResponse:
-    key = f"{make}:{manipulator_id}"
+async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
     try:
-        return manipulators[key].state()
+        return await manipulators[make][manipulator_id].state()
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Manipulator {key} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=503, detail=f"Manipulator state could not be retrieved: {e}"
