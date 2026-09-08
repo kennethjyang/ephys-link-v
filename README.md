@@ -100,10 +100,13 @@ Custom state and functionality are also documented here for client applications 
 #### Manipulator State
 
 - Current position (in millimeters)
-- If it's moving (i.e., actively in a task)
+- Current active task ID
 
 > [!IMPORTANT]
 > All position units must be standardized to millimeters. Clients are expected to read and write in millimeters.
+
+Having an active task ID means the manipualtor is moving. Once cleared the manipulator is no longer moving, however the
+task may not be completed.
 
 The contents of state information depend on the support of the platform. For example, New Scale has no concept of
 orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field. Since
@@ -148,7 +151,7 @@ When a task is created, all ongoing tasks that use a manipulator in the current 
 running `/stop_all` will set all ongoing tasks to the canceled state (has an end time).
 
 > [!IMPORTANT]
-> Every manipulator should only be in **at most one** ongoing task at a time.
+> Every manipulator can only be in **at most one** ongoing task at a time.
 
 Tasks are set for removal once they stop (completion, error, or canceled). Their state message is set to errors or
 cancellation when they stop, and then after a polling call is made (meaning someone has read it), they are deleted from

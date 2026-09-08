@@ -95,10 +95,10 @@ class ManipulatorStateResponse(CamelModel):
 
     Args:
         position: Manipulator translation stage values in mm.
-        is_moving: Flag for if this manipulator is in an _ongoing_ task.
+        active_task_id: Task ID this manipulator is actively moving in. None means the manipulator is stopped.
     """
 
     model_config = ConfigDict(extra="allow")
 
     position: Annotated[list[float], Field(min_length=1)]
-    is_moving: bool
+    active_task_id: str | None = None
