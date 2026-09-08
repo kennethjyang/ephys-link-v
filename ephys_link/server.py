@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Query
 
 from ephys_link.manipulators import manipulators
@@ -9,6 +10,13 @@ from ephys_link.models import ManipulatorStateResponse, ServerStateResponse, Tas
 from ephys_link.tasks import tasks
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
