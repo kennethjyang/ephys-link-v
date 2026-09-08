@@ -20,7 +20,7 @@ app.add_middleware(
 
 
 @app.get("/")
-async def server_state() -> ServerStateResponse:
+def server_state() -> ServerStateResponse:
     return ServerStateResponse(
         server_version="5.1.0-dev1",
         manipulators=[
@@ -101,3 +101,8 @@ def task_state(task_id: str) -> TaskState:
         raise HTTPException(
             status_code=503, detail=f"Task {task_id} could not be retrieved"
         )
+
+
+@app.put("/stop_all")
+async def stop_all():
+    pass
