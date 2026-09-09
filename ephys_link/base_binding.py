@@ -30,6 +30,9 @@ class BaseBinding(ABC):
         self, position: list[float], speed: float, task_id: str
     ) -> None:
         """Sets the position of the manipulator while updating the task.
+
+        Once the movement is complete, implementer _must_ set the task end time.
+
         Args:
             position: List of absolute positions to write to the manipulator in mm.
             speed: Speed of the manipulator in mm/s.
