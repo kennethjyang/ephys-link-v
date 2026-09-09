@@ -9,10 +9,11 @@ from fastapi.params import Query
 
 from ephys_link.manipulators import find_manipulators, manipulators
 from ephys_link.models import (
+    CustomPayload,
     ManipulatorStateResponse,
     ServerStateResponse,
     SetPositionPayload,
-    SetPositionResponse,
+    TaskCreationResponse,
     TaskState,
 )
 from ephys_link.tasks import tasks
@@ -221,7 +222,7 @@ async def set_position(
     manipulator_id: str,
     payload: SetPositionPayload,
     background_task: BackgroundTasks,
-):
+) -> TaskCreationResponse:
     """Sets the position of a manipulator.
 
     Args:
@@ -235,7 +236,10 @@ async def set_position(
         and 503 if there was a problem creating the task.
     """
     try:
-        associated_manipulator = manipulators[make][manipulator_id]
+        target_manipulator = manipulators[make][manipulator_id]
+
+        # Stop previous task.
+        await stop_manipulator(make, manipulator_id)
 
         # Create task.
         task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
@@ -244,14 +248,68 @@ async def set_position(
 
         # Schedule movement.
         background_task.add_task(
-            associated_manipulator.set_position,
+            target_manipulator.set_position,
             payload.position,
             payload.speed,
             task_id,
         )
 
-        return SetPositionResponse(task_id=task_id)
+        return TaskCreationResponse(task_id=task_id)
     except KeyError:
         raise HTTPException(
             status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Unable to set position: {e}")
+
+
+@app.put("/custom/{make}/{manipulator_id}")
+async def custom(
+    make: str,
+    manipulator_id: str,
+    payload: CustomPayload,
+    background_task: BackgroundTasks,
+) -> TaskCreationResponse:
+    """Calls a custom command on the manipulator's binding.
+
+    Args:
+        make: Manufacturer of the manipulator to call in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+        payload: Custom method signature.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation,
+        404 if the manipulator or command wasn't found,
+        and 503 if there was a problem running the custom command.
+    """
+    try:
+        target_manipulator = manipulators[make][manipulator_id]
+
+        # Extract the method.
+        target_method = getattr(target_manipulator, payload.name)
+        if not callable(target_method):
+            raise HTTPException(
+                status_code=404, detail=f'Custom command "{payload.name}" not found.'
+            )
+
+        # Stop previous task.
+        await stop_manipulator(make, manipulator_id)
+
+        # Create task.
+        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task_id = str(uuid4())
+        tasks[task_id] = task
+
+        # Schedule command.
+        background_task.add_task(target_method, **payload.kwargs)
+
+        return TaskCreationResponse(task_id=task_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f'Unable to run custom command "{payload.name}": {e}',
         )

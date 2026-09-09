@@ -1,4 +1,4 @@
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -117,10 +117,23 @@ class SetPositionPayload(Model):
     speed: Annotated[float, Field(gt=0)]
 
 
-class SetPositionResponse(Model):
-    """Response for setting the position of a manipulator.
+class TaskCreationResponse(Model):
+    """Response for a route that creates a task.
+
     Args:
-        task_id: Task ID the manipulator is actively moving in.
+        task_id: Task ID the manipulator is involved in.
     """
 
     task_id: str
+
+
+class CustomPayload(Model):
+    """Payload for a custom method call.
+
+    Args:
+        name: Name of the custom method.
+        kwargs: Keyword arguments for the custom method.
+    """
+
+    name: str
+    kwargs: dict[str, Any]
