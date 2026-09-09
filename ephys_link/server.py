@@ -1,4 +1,5 @@
 from collections import defaultdict
+from time import time
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException
@@ -45,11 +46,11 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         return await manipulators[make][manipulator_id].state()
     except KeyError:
         raise HTTPException(
-            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found"
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
         )
     except Exception as e:
         raise HTTPException(
-            status_code=503, detail=f"Manipulator state could not be retrieved: {e}"
+            status_code=503, detail=f"Manipulator state could not be retrieved: {e}."
         )
 
 
@@ -78,7 +79,7 @@ async def manipulator_states(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f'Malformed manipulator identifier pair "{manipulator}"',
+                detail=f'Malformed manipulator identifier pair "{manipulator}".',
             )
 
     return dict(response)
@@ -96,10 +97,58 @@ def task_state(task_id: str) -> TaskState:
     try:
         return tasks[task_id]
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
     except Exception:
         raise HTTPException(
-            status_code=503, detail=f"Task {task_id} could not be retrieved"
+            status_code=503, detail=f"Task {task_id} could not be retrieved."
+        )
+
+
+@app.put("/stop/{make}/{manipulator_id}")
+async def stop(make: str, manipulator_id: str):
+    """Stops a manipulator and updates associated task.
+    Args:
+        make: Manufacturer of the manipulator in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+    Returns:
+        200 if it worked, 404 if the manipulator wasn't found, and 503 if there was a problem stopping the manipulator.
+    """
+    try:
+        # Stop the manipulator.
+        await manipulators[make][manipulator_id].stop()
+
+        # Remove manipulator from its task.
+        task_id = manipulators[make][manipulator_id].task_id
+
+        # Shouldn't be None, but guard just in case.
+        if not task_id:
+            return
+
+        # Remove manipulator from task.
+        associated_task = tasks[task_id]
+        final_manipulators = associated_task.manipulators - {(make, manipulator_id)}
+
+        # Also cancel the task if all manipulators removed.
+        if len(final_manipulators) == 0:
+            tasks[task_id] = associated_task.model_copy(
+                update={"manipulators": {}, "time_ended": time(), "message": "Stopped."}
+            )
+        else:
+            tasks[task_id] = associated_task.model_copy(
+                update={"manipulators": final_manipulators}
+            )
+
+        # Remove task from manipulator.
+        manipulators[make][manipulator_id].task_id = None
+
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to stop manipulator {make} {manipulator_id}. Try again.",
         )
 
 
