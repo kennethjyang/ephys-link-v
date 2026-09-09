@@ -1,13 +1,20 @@
 from collections import defaultdict
 from time import time
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Query
 
 from ephys_link.manipulators import find_manipulators, manipulators
-from ephys_link.models import ManipulatorStateResponse, ServerStateResponse, TaskState
+from ephys_link.models import (
+    ManipulatorStateResponse,
+    ServerStateResponse,
+    SetPositionPayload,
+    SetPositionResponse,
+    TaskState,
+)
 from ephys_link.tasks import tasks
 
 # Configure API server.
@@ -49,7 +56,8 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         make: Manufacturer of the manipulator in kebab-case
         manipulator_id: Manipulator ID. Must be unique to the make namespace.
     Returns:
-        Manipulator state or 404 if the manipulator wasn't found at startup and 503 if there was a problem getting the state.
+        Manipulator state or 404 if the manipulator wasn't found at startup
+        and 503 if there was a problem getting the state.
     """
     try:
         return await manipulators[make][manipulator_id].state()
@@ -103,7 +111,8 @@ def task_state(task_id: str) -> TaskState:
     Args:
         task_id: Task ID.
     Returns:
-        Task state or 404 if the task doesn't exist, 503 if there was a problem getting the task.
+        Task state or 404 if the task doesn't exist,
+        503 if there was a problem getting the task.
     """
     try:
         requested_task = tasks[task_id]
@@ -128,7 +137,9 @@ async def stop_manipulator(make: str, manipulator_id: str):
         make: Manufacturer of the manipulator in kebab-case.
         manipulator_id: Manipulator ID. Must be unique to the make namespace.
     Returns:
-        200 if it worked, 404 if the manipulator wasn't found, and 503 if there was a problem stopping the manipulator.
+        200 if it worked,
+        404 if the manipulator wasn't found,
+        and 503 if there was a problem stopping the manipulator.
     """
     try:
         # Stop the manipulator.
@@ -176,7 +187,9 @@ async def stop_task(task_id: str):
     Args:
         task_id: Task ID to stop.
     Returns:
-        200 if it worked, 404 if the task or manipulator wasn't found, and 503 if there was a problem stopping the task.
+        200 if it worked,
+        404 if the task or manipulator wasn't found,
+        and 503 if there was a problem stopping the task.
     """
     try:
         requested_task = tasks[task_id]
@@ -200,3 +213,45 @@ async def stop_all():
     """
     for task_id in manipulators:
         await stop_task(task_id)
+
+
+@app.put("/set-position/{make}/{manipulator_id}")
+async def set_position(
+    make: str,
+    manipulator_id: str,
+    payload: SetPositionPayload,
+    background_task: BackgroundTasks,
+):
+    """Sets the position of a manipulator.
+
+    Args:
+        make: Manufacturer of the manipulator in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+        payload: Set position task payload.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation,
+        404 if the manipulator wasn't found,
+        and 503 if there was a problem creating the task.
+    """
+    try:
+        associated_manipulator = manipulators[make][manipulator_id]
+
+        # Create task.
+        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task_id = str(uuid4())
+        tasks[task_id] = task
+
+        # Schedule movement.
+        background_task.add_task(
+            associated_manipulator.set_position,
+            payload.position,
+            payload.speed,
+            task_id,
+        )
+
+        return SetPositionResponse(task_id=task_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )

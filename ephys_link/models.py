@@ -104,3 +104,23 @@ class ManipulatorStateResponse(Model):
 
     position: Annotated[list[float], Field(min_length=1)]
     active_task_id: str | None = None
+
+
+class SetPositionPayload(Model):
+    """Payload for setting the position of a manipulator.
+    Args:
+        position: Manipulator translation stage values in mm.
+        speed: Speed of the movement in mm/s.
+    """
+
+    position: Annotated[list[float], Field(min_length=1)]
+    speed: Annotated[float, Field(gt=0)]
+
+
+class SetPositionResponse(Model):
+    """Response for setting the position of a manipulator.
+    Args:
+        task_id: Task ID the manipulator is actively moving in.
+    """
+
+    task_id: str
