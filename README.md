@@ -72,6 +72,7 @@ Idempotent information retrieval from the server using `GET`.
 | Route                     | Example                                      | Returns                                                                                               |
 |---------------------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `/`                       |                                              | Report server version and an array of all found manipulators.                                         |
+| `/find`                   |                                              | Search for manipulators again.                                                                        |
 | `/{make}/{ID}`            | `/sensapex/3`                                | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
 | `/state[?ids={make:ID}]+` | `/state?ids=sensapex:3?ids=new-scale:A`      | An array of manipulator states based on the request                                                   |
 | `/task/{task ID}`         | `/task/123e4567-e89b-12d3-a456-426614174000` | Polling endpoint for a task. Informs the state of the task or returns 404 if it's no longer running.  |

@@ -6,10 +6,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Query
 
-from ephys_link.manipulators import manipulators
+from ephys_link.manipulators import find_manipulators, manipulators
 from ephys_link.models import ManipulatorStateResponse, ServerStateResponse, TaskState
 from ephys_link.tasks import tasks
 
+# Configure API server.
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +23,7 @@ app.add_middleware(
 
 @app.get("/")
 def server_state() -> ServerStateResponse:
+    """Return the server state and known manipulators."""
     return ServerStateResponse(
         server_version="5.1.0-dev1",
         manipulators=[
@@ -30,6 +32,13 @@ def server_state() -> ServerStateResponse:
             for manipulator in make.values()
         ],
     )
+
+
+@app.get("/find")
+async def find() -> ServerStateResponse:
+    """Prompt the server to find manipulators again and return the server state."""
+    await find_manipulators()
+    return server_state()
 
 
 @app.get("/{make}/{manipulator_id}")
@@ -98,9 +107,9 @@ def task_state(task_id: str) -> TaskState:
         return tasks[task_id]
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
-    except Exception:
+    except Exception as e:
         raise HTTPException(
-            status_code=503, detail=f"Task {task_id} could not be retrieved."
+            status_code=503, detail=f"Task {task_id} could not be retrieved: {e}."
         )
 
 
