@@ -75,7 +75,7 @@ async def manipulator_states(
         manipulators_requested: List of manipulators to query formatted as "{make}/{manipulator_id}".
     Returns:
         Nested object with each manipulator's state requested in Make -> ID -> State format.
-        Will immediately terminate with 404 or 503 if there was a problem getting a state.
+        Will immediately terminate if one of the requested manipulators fail to report state.
         Will return 400 if the identifier pair was malformed.
     """
     response = defaultdict(dict)
@@ -98,13 +98,21 @@ async def manipulator_states(
 def task_state(task_id: str) -> TaskState:
     """Retrieves the state of a task.
 
+    Removes completed tasks after reading.
+
     Args:
         task_id: Task ID.
     Returns:
         Task state or 404 if the task doesn't exist, 503 if there was a problem getting the task.
     """
     try:
-        return tasks[task_id]
+        requested_task = tasks[task_id]
+
+        # Remove the task if it has ended.
+        if not requested_task.time_ended:
+            del tasks[task_id]
+
+        return requested_task
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
     except Exception as e:
@@ -113,8 +121,8 @@ def task_state(task_id: str) -> TaskState:
         )
 
 
-@app.put("/stop/{make}/{manipulator_id}")
-async def stop(make: str, manipulator_id: str):
+@app.put("/stop-manipulator/{make}/{manipulator_id}")
+async def stop_manipulator(make: str, manipulator_id: str):
     """Stops a manipulator and updates associated task.
     Args:
         make: Manufacturer of the manipulator in kebab-case.
@@ -129,7 +137,7 @@ async def stop(make: str, manipulator_id: str):
         # Remove manipulator from its task.
         task_id = manipulators[make][manipulator_id].task_id
 
-        # Shouldn't be None, but guard just in case.
+        # Exit if there wasn't a task attached (i.e. it was already stopped).
         if not task_id:
             return
 
@@ -154,13 +162,41 @@ async def stop(make: str, manipulator_id: str):
         raise HTTPException(
             status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
         )
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=503,
-            detail=f"Unable to stop manipulator {make} {manipulator_id}. Try again.",
+            detail=f"Unable to stop manipulator {make} {manipulator_id}: {e}.",
         )
 
 
-@app.put("/stop_all")
+@app.put("/stop-task/{task_id}")
+async def stop_task(task_id: str):
+    """Stops all manipulators in a task.
+
+    Args:
+        task_id: Task ID to stop.
+    Returns:
+        200 if it worked, 404 if the task or manipulator wasn't found, and 503 if there was a problem stopping the task.
+    """
+    try:
+        requested_task = tasks[task_id]
+
+        # Exit if already stopped.
+        if requested_task.time_ended:
+            return
+
+        for make, manipulator_id in requested_task.manipulators:
+            await stop_manipulator(make, manipulator_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
+
+
+@app.put("/stop-all")
 async def stop_all():
-    pass
+    """Stops all tasks.
+
+    Returns:
+        200 if it worked and 404 or 503 if there was a problem stopping the tasks.
+    """
+    for task_id in manipulators:
+        await stop_task(task_id)
