@@ -4,3 +4,11 @@ from ephys_link.base_binding import BaseBinding
 # Make -> ID -> Binding.
 # In kebab-case.
 manipulators: dict[str, dict[str, BaseBinding]] = {}
+
+
+async def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
+    """Search across binding interfaces for manipulators and return them."""
+    global manipulators
+
+    manipulators = {}
+    return manipulators

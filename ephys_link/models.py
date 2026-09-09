@@ -1,4 +1,4 @@
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -10,13 +10,15 @@ from pydantic import (
 from pydantic.alias_generators import to_camel
 
 
-class CamelModel(BaseModel):
-    """Model with camel-case named enabled."""
+class Model(BaseModel):
+    """Immutable model with camel-case named enabled."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(
+        frozen=True, alias_generator=to_camel, populate_by_name=True
+    )
 
 
-class ManipulatorInfo(CamelModel):
+class ManipulatorInfo(Model):
     """Definition of a manipulator.
 
     Args:
@@ -35,7 +37,7 @@ class ManipulatorInfo(CamelModel):
         list[tuple[float, float]],
         Field(min_length=1),
     ]
-    custom_properties: list[str]
+    custom_properties: set[str]
     custom_functions: dict[str, list[str]]
 
     # noinspection nested-decorators
@@ -51,20 +53,20 @@ class ManipulatorInfo(CamelModel):
         return value
 
 
-class TaskState(CamelModel):
+class TaskState(Model):
     """State of a manipulator task.
 
     Args:
         time_started: Time stamp of when the task was created (in seconds).
         manipulators: Make-ID pairs of manipulators involved.
         time_ended: Time stamp of when the task was ended (in seconds). Is None when unfinished.
-        message: Progress and any reports for clients. Can be empty, but not None.
+        message: Progress and any reports for clients. None means no message.
     """
 
     time_started: Annotated[float, Field(gt=0)]
-    manipulators: list[tuple[str, str]]
+    manipulators: set[tuple[str, str]]
     time_ended: Annotated[float | None, Field(None, gt=0)]
-    message: str = ""
+    message: str | None = None
 
     @model_validator(mode="after")
     def validate_time_stamp(self) -> Self:
@@ -78,27 +80,60 @@ class TaskState(CamelModel):
         return self
 
 
-class ServerStateResponse(CamelModel):
+class ServerStateResponse(Model):
     """Version and known manipulators response.
 
     Args:
         server_version: Ephys Link V server version.
-        manipulators: List of found manipulators at startup.
+        manipulators: Set of found manipulators at startup.
     """
 
     server_version: str
-    manipulators: list[ManipulatorInfo]
+    manipulators: set[ManipulatorInfo]
 
 
-class ManipulatorStateResponse(CamelModel):
+class ManipulatorStateResponse(Model):
     """Individual manipulator state response.
 
     Args:
         position: Manipulator translation stage values in mm.
-        is_moving: Flag for if this manipulator is in an _ongoing_ task.
+        active_task_id: Task ID this manipulator is actively moving in. None means the manipulator is stopped.
     """
 
     model_config = ConfigDict(extra="allow")
 
     position: Annotated[list[float], Field(min_length=1)]
-    is_moving: bool
+    active_task_id: str | None = None
+
+
+class SetPositionPayload(Model):
+    """Payload for setting the position of a manipulator.
+    Args:
+        position: Manipulator translation stage values in mm.
+        speed: Speed of the movement in mm/s.
+    """
+
+    position: Annotated[list[float], Field(min_length=1)]
+    speed: Annotated[float, Field(gt=0)]
+
+
+class TaskCreationResponse(Model):
+    """Response for a route that creates a task.
+
+    Args:
+        task_id: Task ID the manipulator is involved in.
+    """
+
+    task_id: str
+
+
+class CustomPayload(Model):
+    """Payload for a custom method call.
+
+    Args:
+        name: Name of the custom method.
+        kwargs: Keyword arguments for the custom method.
+    """
+
+    name: str
+    kwargs: dict[str, Any]

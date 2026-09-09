@@ -1,14 +1,24 @@
 from collections import defaultdict
+from time import time
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Query
 
-from ephys_link.manipulators import manipulators
-from ephys_link.models import ManipulatorStateResponse, ServerStateResponse, TaskState
+from ephys_link.manipulators import find_manipulators, manipulators
+from ephys_link.models import (
+    CustomPayload,
+    ManipulatorStateResponse,
+    ServerStateResponse,
+    SetPositionPayload,
+    TaskCreationResponse,
+    TaskState,
+)
 from ephys_link.tasks import tasks
 
+# Configure API server.
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -20,7 +30,8 @@ app.add_middleware(
 
 
 @app.get("/")
-async def server_state() -> ServerStateResponse:
+def server_state() -> ServerStateResponse:
+    """Return the server state and known manipulators."""
     return ServerStateResponse(
         server_version="5.1.0-dev1",
         manipulators=[
@@ -31,6 +42,13 @@ async def server_state() -> ServerStateResponse:
     )
 
 
+@app.get("/find")
+async def find() -> ServerStateResponse:
+    """Prompt the server to find manipulators again and return the server state."""
+    await find_manipulators()
+    return server_state()
+
+
 @app.get("/{make}/{manipulator_id}")
 async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
     """Query the state of a manipulator.
@@ -39,17 +57,18 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         make: Manufacturer of the manipulator in kebab-case
         manipulator_id: Manipulator ID. Must be unique to the make namespace.
     Returns:
-        Manipulator state or 404 if the manipulator wasn't found at startup and 503 if there was a problem getting the state.
+        Manipulator state or 404 if the manipulator wasn't found at startup
+        and 503 if there was a problem getting the state.
     """
     try:
         return await manipulators[make][manipulator_id].state()
     except KeyError:
         raise HTTPException(
-            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found"
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
         )
     except Exception as e:
         raise HTTPException(
-            status_code=503, detail=f"Manipulator state could not be retrieved: {e}"
+            status_code=503, detail=f"Manipulator state could not be retrieved: {e}."
         )
 
 
@@ -65,7 +84,7 @@ async def manipulator_states(
         manipulators_requested: List of manipulators to query formatted as "{make}/{manipulator_id}".
     Returns:
         Nested object with each manipulator's state requested in Make -> ID -> State format.
-        Will immediately terminate with 404 or 503 if there was a problem getting a state.
+        Will immediately terminate if one of the requested manipulators fail to report state.
         Will return 400 if the identifier pair was malformed.
     """
     response = defaultdict(dict)
@@ -78,7 +97,7 @@ async def manipulator_states(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f'Malformed manipulator identifier pair "{manipulator}"',
+                detail=f'Malformed manipulator identifier pair "{manipulator}".',
             )
 
     return dict(response)
@@ -88,16 +107,209 @@ async def manipulator_states(
 def task_state(task_id: str) -> TaskState:
     """Retrieves the state of a task.
 
+    Removes completed tasks after reading.
+
     Args:
         task_id: Task ID.
     Returns:
-        Task state or 404 if the task doesn't exist, 503 if there was a problem getting the task.
+        Task state or 404 if the task doesn't exist,
+        503 if there was a problem getting the task.
     """
     try:
-        return tasks[task_id]
+        requested_task = tasks[task_id]
+
+        # Remove the task if it has ended.
+        if not requested_task.time_ended:
+            del tasks[task_id]
+
+        return requested_task
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-    except Exception:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
+    except Exception as e:
         raise HTTPException(
-            status_code=503, detail=f"Task {task_id} could not be retrieved"
+            status_code=503, detail=f"Task {task_id} could not be retrieved: {e}."
+        )
+
+
+@app.put("/stop-manipulator/{make}/{manipulator_id}")
+async def stop_manipulator(make: str, manipulator_id: str):
+    """Stops a manipulator and updates associated task.
+    Args:
+        make: Manufacturer of the manipulator in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+    Returns:
+        200 if it worked,
+        404 if the manipulator wasn't found,
+        and 503 if there was a problem stopping the manipulator.
+    """
+    try:
+        # Stop the manipulator.
+        await manipulators[make][manipulator_id].stop()
+
+        # Remove manipulator from its task.
+        task_id = manipulators[make][manipulator_id].task_id
+
+        # Exit if there wasn't a task attached (i.e. it was already stopped).
+        if not task_id:
+            return
+
+        # Remove manipulator from task.
+        associated_task = tasks[task_id]
+        final_manipulators = associated_task.manipulators - {(make, manipulator_id)}
+
+        # Also cancel the task if all manipulators removed.
+        if len(final_manipulators) == 0:
+            tasks[task_id] = associated_task.model_copy(
+                update={"manipulators": {}, "time_ended": time(), "message": "Stopped."}
+            )
+        else:
+            tasks[task_id] = associated_task.model_copy(
+                update={"manipulators": final_manipulators}
+            )
+
+        # Remove task from manipulator.
+        manipulators[make][manipulator_id].task_id = None
+
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to stop manipulator {make} {manipulator_id}: {e}.",
+        )
+
+
+@app.put("/stop-task/{task_id}")
+async def stop_task(task_id: str):
+    """Stops all manipulators in a task.
+
+    Args:
+        task_id: Task ID to stop.
+    Returns:
+        200 if it worked,
+        404 if the task or manipulator wasn't found,
+        and 503 if there was a problem stopping the task.
+    """
+    try:
+        requested_task = tasks[task_id]
+
+        # Exit if already stopped.
+        if requested_task.time_ended:
+            return
+
+        for make, manipulator_id in requested_task.manipulators:
+            await stop_manipulator(make, manipulator_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
+
+
+@app.put("/stop-all")
+async def stop_all():
+    """Stops all tasks.
+
+    Returns:
+        200 if it worked and 404 or 503 if there was a problem stopping the tasks.
+    """
+    for task_id in manipulators:
+        await stop_task(task_id)
+
+
+@app.put("/set-position/{make}/{manipulator_id}")
+async def set_position(
+    make: str,
+    manipulator_id: str,
+    payload: SetPositionPayload,
+    background_task: BackgroundTasks,
+) -> TaskCreationResponse:
+    """Sets the position of a manipulator.
+
+    Args:
+        make: Manufacturer of the manipulator in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+        payload: Set position task payload.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation,
+        404 if the manipulator wasn't found,
+        and 503 if there was a problem creating the task.
+    """
+    try:
+        target_manipulator = manipulators[make][manipulator_id]
+
+        # Stop previous task.
+        await stop_manipulator(make, manipulator_id)
+
+        # Create task.
+        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task_id = str(uuid4())
+        tasks[task_id] = task
+
+        # Schedule movement.
+        background_task.add_task(
+            target_manipulator.set_position,
+            payload.position,
+            payload.speed,
+            task_id,
+        )
+
+        return TaskCreationResponse(task_id=task_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Unable to set position: {e}")
+
+
+@app.put("/custom/{make}/{manipulator_id}")
+async def custom(
+    make: str,
+    manipulator_id: str,
+    payload: CustomPayload,
+    background_task: BackgroundTasks,
+) -> TaskCreationResponse:
+    """Calls a custom command on the manipulator's binding.
+
+    Args:
+        make: Manufacturer of the manipulator to call in kebab-case.
+        manipulator_id: Manipulator ID. Must be unique to the make namespace.
+        payload: Custom method signature.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation,
+        404 if the manipulator or command wasn't found,
+        and 503 if there was a problem running the custom command.
+    """
+    try:
+        target_manipulator = manipulators[make][manipulator_id]
+
+        # Extract the method.
+        target_method = getattr(target_manipulator, payload.name)
+        if not callable(target_method):
+            raise HTTPException(
+                status_code=404, detail=f'Custom command "{payload.name}" not found.'
+            )
+
+        # Stop previous task.
+        await stop_manipulator(make, manipulator_id)
+
+        # Create task.
+        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task_id = str(uuid4())
+        tasks[task_id] = task
+
+        # Schedule command.
+        background_task.add_task(target_method, **payload.kwargs)
+
+        return TaskCreationResponse(task_id=task_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Manipulator {make} {manipulator_id} not found."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f'Unable to run custom command "{payload.name}": {e}',
         )

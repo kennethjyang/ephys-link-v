@@ -72,6 +72,7 @@ Idempotent information retrieval from the server using `GET`.
 | Route                     | Example                                      | Returns                                                                                               |
 |---------------------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `/`                       |                                              | Report server version and an array of all found manipulators.                                         |
+| `/find`                   |                                              | Search for manipulators again.                                                                        |
 | `/{make}/{ID}`            | `/sensapex/3`                                | An object with the current state of that manipulator. Returns 404 if that manipulator does not exist. |
 | `/state[?ids={make:ID}]+` | `/state?ids=sensapex:3?ids=new-scale:A`      | An array of manipulator states based on the request                                                   |
 | `/task/{task ID}`         | `/task/123e4567-e89b-12d3-a456-426614174000` | Polling endpoint for a task. Informs the state of the task or returns 404 if it's no longer running.  |
@@ -100,10 +101,13 @@ Custom state and functionality are also documented here for client applications 
 #### Manipulator State
 
 - Current position (in millimeters)
-- If it's moving (i.e., actively in a task)
+- Current active task ID
 
 > [!IMPORTANT]
 > All position units must be standardized to millimeters. Clients are expected to read and write in millimeters.
+
+Having an active task ID means the manipualtor is moving. Once cleared the manipulator is no longer moving, however the
+task may not be completed.
 
 The contents of state information depend on the support of the platform. For example, New Scale has no concept of
 orientation, and Sensapex uMp-4 only knows the depth axis angle. This is why orientation is not a required field. Since
@@ -130,13 +134,13 @@ done. The message field will describe the termination state (i.e., "Canceled").
 
 Actions on the manipulators via `PUT` routes.
 
-| Route                       | Example                                      | Input                                | Description                                           |
-|-----------------------------|----------------------------------------------|--------------------------------------|-------------------------------------------------------|
-| `/stop_all`                 |                                              |                                      | Stops all manipulator movement (any ongoing tasks).   |
-| `/stop/{make}/{ID}`         | `/stop/sensapex/3`                           |                                      | Stops a specific manipulator.                         |
-| `/stop/{task ID}`           | `/stop/123e4567-e89b-12d3-a456-426614174000` |                                      | Stops all manipulators in a task.                     |
-| `/set-position/{make}/{ID}` | `/set-position/sensapex/3`                   | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
-| `/custom/{make}/{ID}`       | `/custom/sensapex/3`                         | Arbitrary object.                    | Calls a custom command matched with duck typing.      |
+| Route                           | Example                                      | Input                                | Description                                           |
+|---------------------------------|----------------------------------------------|--------------------------------------|-------------------------------------------------------|
+| `/stop-all`                     |                                              |                                      | Stops all manipulator movement (any ongoing tasks).   |
+| `/stop-manipulator/{make}/{ID}` | `/stop/sensapex/3`                           |                                      | Stops a specific manipulator.                         |
+| `/stop-task/{task ID}`          | `/stop/123e4567-e89b-12d3-a456-426614174000` |                                      | Stops all manipulators in a task.                     |
+| `/set-position/{make}/{ID}`     | `/set-position/sensapex/3`                   | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
+| `/custom/{make}/{ID}`           | `/custom/sensapex/3`                         | Arbitrary object.                    | Calls a custom command matched with duck typing.      |
 
 #### Task Lifecycle
 
@@ -148,7 +152,7 @@ When a task is created, all ongoing tasks that use a manipulator in the current 
 running `/stop_all` will set all ongoing tasks to the canceled state (has an end time).
 
 > [!IMPORTANT]
-> Every manipulator should only be in **at most one** ongoing task at a time.
+> Every manipulator can only be in **at most one** ongoing task at a time.
 
 Tasks are set for removal once they stop (completion, error, or canceled). Their state message is set to errors or
 cancellation when they stop, and then after a polling call is made (meaning someone has read it), they are deleted from
