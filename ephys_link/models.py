@@ -109,6 +109,7 @@ class ManipulatorStateResponse(Model):
 
 class SetPositionPayload(Model):
     """Payload for setting the position of a manipulator.
+
     Args:
         position: Manipulator translation stage values in mm.
         speed: Speed of the movement in mm/s.

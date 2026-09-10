@@ -49,7 +49,7 @@ async def find() -> ServerStateResponse:
     return server_state()
 
 
-@app.get("/{make}/{manipulator_id}")
+@app.get("/state/{make}/{manipulator_id}")
 async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
     """Query the state of a manipulator.
 
@@ -72,7 +72,7 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         )
 
 
-@app.get("/state")
+@app.get("/states")
 async def manipulator_states(
     manipulators_requested: Annotated[
         list[str], Query(alias="manipulator", min_length=1)
@@ -83,9 +83,10 @@ async def manipulator_states(
     Args:
         manipulators_requested: List of manipulators to query formatted as "{make}/{manipulator_id}".
     Returns:
-        Nested object with each manipulator's state requested in Make -> ID -> State format.
-        Will immediately terminate if one of the requested manipulators fail to report state.
-        Will return 400 if the identifier pair was malformed.
+        Nested object with each manipulator's state requested in Make -> ID -> State format,
+        will terminate with 404 if one of the requested manipulators isn't found,
+        will terminate with 503 if one of the requested manipulators fail to report state,
+        and will terminate with  400 if the identifier pair was malformed.
     """
     response = defaultdict(dict)
     for manipulator in manipulators_requested:
@@ -253,6 +254,25 @@ async def set_position(
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Unable to set position: {e}")
+
+
+@app.put("/set-positions")
+async def set_positions(
+    payload: dict[str, dict[str, SetPositionPayload]],
+    background_task: BackgroundTasks,
+) -> TaskCreationResponse:
+    """Set the position of multiple manipulators in one task.
+
+    Args:
+        payload: Map of set positions for each requested Make -> Manipulator ID -> Position payload.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation.
+        will terminate with 404 if one of the requested manipulators isn't found,
+        will terminate with 503 if one of the requested manipulators fail to launch movement,
+        and will terminate with 400 if the identifier pair was malformed.
+    """
+    return TaskCreationResponse(task_id="123")
 
 
 @app.put("/custom/{make}/{manipulator_id}")
