@@ -16,7 +16,7 @@ from ephys_link.models import (
     TaskCreationResponse,
     TaskState,
 )
-from ephys_link.tasks import tasks
+from ephys_link.tasks import remove_manipulator, tasks
 
 # Configure API server.
 app = FastAPI()
@@ -153,18 +153,10 @@ async def stop_manipulator(make: str, manipulator_id: str):
         if not task_id:
             return
 
-        # Remove manipulator from task.
-        associated_task = tasks[task_id]
-        final_manipulators = associated_task.manipulators - {(make, manipulator_id)}
-
-        # Also cancel the task if all manipulators removed.
-        if len(final_manipulators) == 0:
-            tasks[task_id] = associated_task.model_copy(
+        # Remove manipulator and then cancel task if there are no more manipulators on it.
+        if remove_manipulator(task_id, make, manipulator_id):
+            tasks[task_id] = tasks[task_id].model_copy(
                 update={"manipulators": {}, "time_ended": time(), "message": "Stopped."}
-            )
-        else:
-            tasks[task_id] = associated_task.model_copy(
-                update={"manipulators": final_manipulators}
             )
 
         # Remove task from manipulator.
