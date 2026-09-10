@@ -242,7 +242,7 @@ async def set_position(
         await stop_manipulator(make, manipulator_id)
 
         # Create task.
-        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task = TaskState(manipulators={(make, manipulator_id)})
         task_id = str(uuid4())
         tasks[task_id] = task
 
@@ -296,7 +296,7 @@ async def custom(
         await stop_manipulator(make, manipulator_id)
 
         # Create task.
-        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task = TaskState(manipulators={(make, manipulator_id)})
         task_id = str(uuid4())
         tasks[task_id] = task
 

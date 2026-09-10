@@ -1,3 +1,4 @@
+from time import time
 from typing import Annotated, Any, Self
 
 from pydantic import (
@@ -63,7 +64,7 @@ class TaskState(Model):
         message: Progress and any reports for clients. None means no message.
     """
 
-    time_started: Annotated[float, Field(gt=0)]
+    time_started: float = time()
     manipulators: set[tuple[str, str]]
     time_ended: Annotated[float | None, Field(None, gt=0)]
     message: str | None = None
