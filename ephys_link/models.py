@@ -38,8 +38,8 @@ class ManipulatorInfo(Model):
         list[tuple[float, float]],
         Field(min_length=1),
     ]
-    custom_properties: set[str]
-    custom_functions: dict[str, list[str]]
+    custom_properties: set[str] = set()
+    custom_functions: dict[str, list[str]] = {}
 
     # noinspection nested-decorators
     @field_validator("axis_limits")
