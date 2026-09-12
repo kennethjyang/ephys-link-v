@@ -1,5 +1,4 @@
 from collections import defaultdict
-from time import time
 from typing import Annotated
 from uuid import uuid4
 
@@ -16,7 +15,7 @@ from ephys_link.models import (
     TaskCreationResponse,
     TaskState,
 )
-from ephys_link.tasks import tasks
+from ephys_link.tasks import end_task, remove_manipulator, tasks
 
 # Configure API server.
 app = FastAPI()
@@ -49,7 +48,7 @@ async def find() -> ServerStateResponse:
     return server_state()
 
 
-@app.get("/{make}/{manipulator_id}")
+@app.get("/state/{make}/{manipulator_id}")
 async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
     """Query the state of a manipulator.
 
@@ -72,7 +71,7 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         )
 
 
-@app.get("/state")
+@app.get("/states")
 async def manipulator_states(
     manipulators_requested: Annotated[
         list[str], Query(alias="manipulator", min_length=1)
@@ -83,9 +82,10 @@ async def manipulator_states(
     Args:
         manipulators_requested: List of manipulators to query formatted as "{make}/{manipulator_id}".
     Returns:
-        Nested object with each manipulator's state requested in Make -> ID -> State format.
-        Will immediately terminate if one of the requested manipulators fail to report state.
-        Will return 400 if the identifier pair was malformed.
+        Nested object with each manipulator's state requested in Make -> ID -> State format,
+        will terminate with 404 if one of the requested manipulators isn't found,
+        will terminate with 503 if one of the requested manipulators fail to report state,
+        and will terminate with  400 if the identifier pair was malformed.
     """
     response = defaultdict(dict)
     for manipulator in manipulators_requested:
@@ -143,32 +143,24 @@ async def stop_manipulator(make: str, manipulator_id: str):
         and 503 if there was a problem stopping the manipulator.
     """
     try:
+        target_manipulator = manipulators[make][manipulator_id]
+
         # Stop the manipulator.
-        await manipulators[make][manipulator_id].stop()
+        await target_manipulator.stop()
 
         # Remove manipulator from its task.
-        task_id = manipulators[make][manipulator_id].task_id
+        task_id = target_manipulator.task_id
 
         # Exit if there wasn't a task attached (i.e. it was already stopped).
         if not task_id:
             return
 
-        # Remove manipulator from task.
-        associated_task = tasks[task_id]
-        final_manipulators = associated_task.manipulators - {(make, manipulator_id)}
-
-        # Also cancel the task if all manipulators removed.
-        if len(final_manipulators) == 0:
-            tasks[task_id] = associated_task.model_copy(
-                update={"manipulators": {}, "time_ended": time(), "message": "Stopped."}
-            )
-        else:
-            tasks[task_id] = associated_task.model_copy(
-                update={"manipulators": final_manipulators}
-            )
+        # Remove manipulator and then cancel task if there are no more manipulators on it.
+        if remove_manipulator(task_id, make, manipulator_id):
+            end_task(task_id, "Stopped")
 
         # Remove task from manipulator.
-        manipulators[make][manipulator_id].task_id = None
+        target_manipulator.task_id = None
 
     except KeyError:
         raise HTTPException(
@@ -193,13 +185,13 @@ async def stop_task(task_id: str):
         and 503 if there was a problem stopping the task.
     """
     try:
-        requested_task = tasks[task_id]
+        target_task = tasks[task_id]
 
         # Exit if already stopped.
-        if requested_task.time_ended:
+        if target_task.time_ended:
             return
 
-        for make, manipulator_id in requested_task.manipulators:
+        for make, manipulator_id in target_task.manipulators:
             await stop_manipulator(make, manipulator_id)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
@@ -242,7 +234,7 @@ async def set_position(
         await stop_manipulator(make, manipulator_id)
 
         # Create task.
-        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task = TaskState(manipulators={(make, manipulator_id)})
         task_id = str(uuid4())
         tasks[task_id] = task
 
@@ -261,6 +253,58 @@ async def set_position(
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Unable to set position: {e}")
+
+
+@app.put("/set-positions")
+async def set_positions(
+    payload: dict[str, dict[str, SetPositionPayload]],
+    background_task: BackgroundTasks,
+) -> TaskCreationResponse:
+    """Set the position of multiple manipulators in one task.
+
+    Args:
+        payload: Map of set positions for each requested Make -> Manipulator ID -> Position payload.
+        background_task: Background task system to launch movement in.
+    Returns:
+        Task ID on successful creation,
+        terminate with 404 if one of the requested manipulators isn't found,
+        and terminate with 503 if one of the requested manipulators fail to launch movement.
+    """
+    task_manipulators: set[tuple[str, str]] = set()
+    task_id = str(uuid4())
+
+    for make, manipulator_payload in payload.items():
+        for manipulator_id, position_payload in manipulator_payload.items():
+            try:
+                # Stop previous task.
+                await stop_manipulator(make, manipulator_id)
+
+                # Add manipulator to task.
+                task_manipulators.add((make, manipulator_id))
+
+                # Schedule movement.
+                background_task.add_task(
+                    manipulators[make][manipulator_id].set_position,
+                    position_payload.position,
+                    position_payload.speed,
+                    task_id,
+                )
+            except KeyError:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Manipulator {make} {manipulator_id} not found.",
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Unable to set position for {make} {manipulator_id}: {e}",
+                )
+
+    # Create task.
+    task = TaskState(manipulators=task_manipulators)
+    tasks[task_id] = task
+
+    return TaskCreationResponse(task_id=task_id)
 
 
 @app.put("/custom/{make}/{manipulator_id}")
@@ -283,10 +327,8 @@ async def custom(
         and 503 if there was a problem running the custom command.
     """
     try:
-        target_manipulator = manipulators[make][manipulator_id]
-
         # Extract the method.
-        target_method = getattr(target_manipulator, payload.name)
+        target_method = getattr(manipulators[make][manipulator_id], payload.name)
         if not callable(target_method):
             raise HTTPException(
                 status_code=404, detail=f'Custom command "{payload.name}" not found.'
@@ -296,7 +338,7 @@ async def custom(
         await stop_manipulator(make, manipulator_id)
 
         # Create task.
-        task = TaskState(time_started=time(), manipulators={(make, manipulator_id)})
+        task = TaskState(manipulators={(make, manipulator_id)})
         task_id = str(uuid4())
         tasks[task_id] = task
 
