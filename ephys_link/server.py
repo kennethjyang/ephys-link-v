@@ -1,5 +1,4 @@
 from collections import defaultdict
-from time import time
 from typing import Annotated
 from uuid import uuid4
 
@@ -16,7 +15,7 @@ from ephys_link.models import (
     TaskCreationResponse,
     TaskState,
 )
-from ephys_link.tasks import remove_manipulator, tasks
+from ephys_link.tasks import end_task, remove_manipulator, tasks
 
 # Configure API server.
 app = FastAPI()
@@ -144,11 +143,13 @@ async def stop_manipulator(make: str, manipulator_id: str):
         and 503 if there was a problem stopping the manipulator.
     """
     try:
+        target_manipulator = manipulators[make][manipulator_id]
+
         # Stop the manipulator.
-        await manipulators[make][manipulator_id].stop()
+        await target_manipulator.stop()
 
         # Remove manipulator from its task.
-        task_id = manipulators[make][manipulator_id].task_id
+        task_id = target_manipulator.task_id
 
         # Exit if there wasn't a task attached (i.e. it was already stopped).
         if not task_id:
@@ -156,12 +157,10 @@ async def stop_manipulator(make: str, manipulator_id: str):
 
         # Remove manipulator and then cancel task if there are no more manipulators on it.
         if remove_manipulator(task_id, make, manipulator_id):
-            tasks[task_id] = tasks[task_id].model_copy(
-                update={"manipulators": {}, "time_ended": time(), "message": "Stopped."}
-            )
+            end_task(task_id, "Stopped")
 
         # Remove task from manipulator.
-        manipulators[make][manipulator_id].task_id = None
+        target_manipulator.task_id = None
 
     except KeyError:
         raise HTTPException(
@@ -186,13 +185,13 @@ async def stop_task(task_id: str):
         and 503 if there was a problem stopping the task.
     """
     try:
-        requested_task = tasks[task_id]
+        target_task = tasks[task_id]
 
         # Exit if already stopped.
-        if requested_task.time_ended:
+        if target_task.time_ended:
             return
 
-        for make, manipulator_id in requested_task.manipulators:
+        for make, manipulator_id in target_task.manipulators:
             await stop_manipulator(make, manipulator_id)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
@@ -277,8 +276,6 @@ async def set_positions(
     for make, manipulator_payload in payload.items():
         for manipulator_id, position_payload in manipulator_payload.items():
             try:
-                target_manipulator = manipulators[make][manipulator_id]
-
                 # Stop previous task.
                 await stop_manipulator(make, manipulator_id)
 
@@ -287,7 +284,7 @@ async def set_positions(
 
                 # Schedule movement.
                 background_task.add_task(
-                    target_manipulator.set_position,
+                    manipulators[make][manipulator_id].set_position,
                     position_payload.position,
                     position_payload.speed,
                     task_id,
@@ -330,10 +327,8 @@ async def custom(
         and 503 if there was a problem running the custom command.
     """
     try:
-        target_manipulator = manipulators[make][manipulator_id]
-
         # Extract the method.
-        target_method = getattr(target_manipulator, payload.name)
+        target_method = getattr(manipulators[make][manipulator_id], payload.name)
         if not callable(target_method):
             raise HTTPException(
                 status_code=404, detail=f'Custom command "{payload.name}" not found.'

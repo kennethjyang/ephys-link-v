@@ -31,7 +31,7 @@ class BaseBinding(ABC):
     ) -> None:
         """Sets the position of the manipulator while updating the task.
 
-        Once the movement is complete, implementer _must_ set the task end time.
+        Once the task is complete, implementer _must_ end the task.
 
         Args:
             position: List of absolute positions to write to the manipulator in mm.
