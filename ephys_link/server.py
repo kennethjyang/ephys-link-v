@@ -42,9 +42,9 @@ def server_state() -> ServerStateResponse:
 
 
 @app.get("/find")
-async def find() -> ServerStateResponse:
+def find() -> ServerStateResponse:
     """Prompt the server to find manipulators again and return the server state."""
-    await find_manipulators()
+    find_manipulators()
     return server_state()
 
 

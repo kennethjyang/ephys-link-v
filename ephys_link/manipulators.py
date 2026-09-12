@@ -6,7 +6,7 @@ from ephys_link.base_binding import BaseBinding
 manipulators: dict[str, dict[str, BaseBinding]] = {}
 
 
-async def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
+def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
     """Search across binding interfaces for manipulators and return them."""
     global manipulators
 
