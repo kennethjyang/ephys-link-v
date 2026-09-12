@@ -267,12 +267,47 @@ async def set_positions(
         payload: Map of set positions for each requested Make -> Manipulator ID -> Position payload.
         background_task: Background task system to launch movement in.
     Returns:
-        Task ID on successful creation.
-        will terminate with 404 if one of the requested manipulators isn't found,
-        will terminate with 503 if one of the requested manipulators fail to launch movement,
-        and will terminate with 400 if the identifier pair was malformed.
+        Task ID on successful creation,
+        terminate with 404 if one of the requested manipulators isn't found,
+        and terminate with 503 if one of the requested manipulators fail to launch movement.
     """
-    return TaskCreationResponse(task_id="123")
+    task_manipulators: set[tuple[str, str]] = set()
+    task_id = str(uuid4())
+
+    for make, manipulator_payload in payload.items():
+        for manipulator_id, position_payload in manipulator_payload.items():
+            try:
+                target_manipulator = manipulators[make][manipulator_id]
+
+                # Stop previous task.
+                await stop_manipulator(make, manipulator_id)
+
+                # Add manipulator to task.
+                task_manipulators.add((make, manipulator_id))
+
+                # Schedule movement.
+                background_task.add_task(
+                    target_manipulator.set_position,
+                    position_payload.position,
+                    position_payload.speed,
+                    task_id,
+                )
+            except KeyError:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Manipulator {make} {manipulator_id} not found.",
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Unable to set position for {make} {manipulator_id}: {e}",
+                )
+
+    # Create task.
+    task = TaskState(manipulators=task_manipulators)
+    tasks[task_id] = task
+
+    return TaskCreationResponse(task_id=task_id)
 
 
 @app.put("/custom/{make}/{manipulator_id}")

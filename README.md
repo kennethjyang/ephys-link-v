@@ -134,13 +134,14 @@ done. The message field will describe the termination state (i.e., "Canceled").
 
 Actions on the manipulators via `PUT` routes.
 
-| Route                           | Example                                      | Input                                | Description                                           |
-|---------------------------------|----------------------------------------------|--------------------------------------|-------------------------------------------------------|
-| `/stop-all`                     |                                              |                                      | Stops all manipulator movement (any ongoing tasks).   |
-| `/stop-manipulator/{make}/{ID}` | `/stop/sensapex/3`                           |                                      | Stops a specific manipulator.                         |
-| `/stop-task/{task ID}`          | `/stop/123e4567-e89b-12d3-a456-426614174000` |                                      | Stops all manipulators in a task.                     |
-| `/set-position/{make}/{ID}`     | `/set-position/sensapex/3`                   | An array of positions for each axis. | Sets the manipulator to this exact translation state. |
-| `/custom/{make}/{ID}`           | `/custom/sensapex/3`                         | Arbitrary object.                    | Calls a custom command matched with duck typing.      |
+| Route                           | Example                                      | Input                                            | Description                                            |
+|---------------------------------|----------------------------------------------|--------------------------------------------------|--------------------------------------------------------|
+| `/stop-all`                     |                                              |                                                  | Stops all manipulator movement (any ongoing tasks).    |
+| `/stop-manipulator/{make}/{ID}` | `/stop/sensapex/3`                           |                                                  | Stops a specific manipulator.                          |
+| `/stop-task/{task ID}`          | `/stop/123e4567-e89b-12d3-a456-426614174000` |                                                  | Stops all manipulators in a task.                      |
+| `/set-position/{make}/{ID}`     | `/set-position/sensapex/3`                   | Position and speed.                              | Sets the manipulator to this exact translation state.  |
+| `/set-positions`                |                                              | Position and speed for each manipulator to move. | Sets each manipulator to this exact translation state. |
+| `/custom/{make}/{ID}`           | `/custom/sensapex/3`                         | Arbitrary object.                                | Calls a custom command matched with duck typing.       |
 
 #### Task Lifecycle
 
