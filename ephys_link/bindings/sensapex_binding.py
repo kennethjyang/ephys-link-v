@@ -27,7 +27,7 @@ class SensapexBinding(BaseBinding):
 
     @override
     async def get_position(self) -> list[float]:
-        return self.device.get_pos()
+        return [axis / 1000 for axis in self.device.get_pos()]
 
     @override
     async def set_position(
@@ -38,7 +38,7 @@ class SensapexBinding(BaseBinding):
 
         # Start movement.
         set_message(task_id, f"Sending movement to Sensapex {self.manipulator_id}.")
-        movement_event = self.device.goto_pos([axis / 1000 for axis in position], speed)
+        movement_event = self.device.goto_pos([axis * 1000 for axis in position], speed)
         set_message(
             task_id,
             f"Movement sent to Sensapex {self.manipulator_id}. Waiting for completion...",
