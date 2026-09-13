@@ -25,4 +25,8 @@ def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
             str(manipulator_id)
         )
 
+    # Fake bindings (uncomment to use).
+    # manipulators["fake"]["0"] = FakeBinding("0")
+    # manipulators["fake"]["1"] = FakeBinding("1")
+
     return manipulators
