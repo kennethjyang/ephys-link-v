@@ -204,7 +204,7 @@ async def stop_all():
     Returns:
         200 if it worked and 404 or 503 if there was a problem stopping the tasks.
     """
-    for task_id in manipulators:
+    for task_id in tasks:
         await stop_task(task_id)
 
 
