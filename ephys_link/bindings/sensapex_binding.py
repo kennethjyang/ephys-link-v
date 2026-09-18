@@ -46,8 +46,18 @@ class SensapexBinding(BaseBinding):
 
         # Wait for movement.
         movement_event.finished_event.wait()
-        if not movement_event.interrupted:
-            set_message(task_id, f"Sensapex {self.manipulator_id} movement finished.")
+
+        # Set message based on end state.
+        if not movement_event.reached_target():
+            set_message(
+                task_id, f"Sensapex {self.manipulator_id} DID NOT reach target."
+            )
+        elif movement_event.interrupted:
+            set_message(
+                task_id, f"Sensapex {self.manipulator_id} movement INTERRUPTED."
+            )
+        else:
+            set_message(task_id, f"Sensapex {self.manipulator_id} movement FINISHED.")
 
         # Remove manipulator and then end task if there are no more manipulators on it.
         if remove_manipulator(task_id, "sensapex", self.manipulator_id):
