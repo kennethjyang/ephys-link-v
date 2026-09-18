@@ -316,6 +316,8 @@ async def custom(
 ) -> TaskCreationResponse:
     """Calls a custom command on the manipulator's binding.
 
+    The custom command _must_ end the task.
+
     Args:
         make: Manufacturer of the manipulator to call in kebab-case.
         manipulator_id: Manipulator ID. Must be unique to the make namespace.
