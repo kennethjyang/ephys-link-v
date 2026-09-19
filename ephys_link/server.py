@@ -15,7 +15,7 @@ from ephys_link.models import (
     TaskCreationResponse,
     TaskState,
 )
-from ephys_link.tasks import end_task, remove_manipulator, tasks
+from ephys_link.tasks import delete_task, end_task, get_task, remove_manipulator, tasks
 
 # Configure API server.
 app = FastAPI()
@@ -104,7 +104,7 @@ async def manipulator_states(
 
 
 @app.get("/task/{task_id}")
-def task_state(task_id: str) -> TaskState:
+async def task_state(task_id: str) -> TaskState:
     """Retrieves the state of a task.
 
     Removes completed tasks after reading.
@@ -116,15 +116,16 @@ def task_state(task_id: str) -> TaskState:
         503 if there was a problem getting the task.
     """
     try:
-        requested_task = tasks[task_id]
+        requested_task = await get_task(task_id)
+
+        if requested_task is None:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
 
         # Remove the task if it has ended.
         if not requested_task.time_ended:
-            del tasks[task_id]
+            await delete_task(task_id)
 
         return requested_task
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
     except Exception as e:
         raise HTTPException(
             status_code=503, detail=f"Task {task_id} could not be retrieved: {e}."
@@ -156,8 +157,8 @@ async def stop_manipulator(make: str, manipulator_id: str):
             return
 
         # Remove manipulator and then cancel task if there are no more manipulators on it.
-        if remove_manipulator(task_id, make, manipulator_id):
-            end_task(task_id, "Stopped")
+        if await remove_manipulator(task_id, make, manipulator_id):
+            await end_task(task_id, "Stopped")
 
         # Remove task from manipulator.
         target_manipulator.task_id = None
@@ -204,7 +205,7 @@ async def stop_all():
     Returns:
         200 if it worked and 404 or 503 if there was a problem stopping the tasks.
     """
-    for task_id in tasks:
+    for task_id in list(tasks):
         await stop_task(task_id)
 
 
