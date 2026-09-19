@@ -31,8 +31,8 @@ class FakeBinding(BaseBinding):
         self.position = position
 
         # Remove manipulator and then end task if there are no more manipulators on it.
-        if remove_manipulator(task_id, "fake", self.manipulator_id):
-            end_task(task_id, "Completed")
+        if await remove_manipulator(task_id, "fake", self.manipulator_id):
+            await end_task(task_id, "Completed")
 
         # Remove task from manipulator.
         self.task_id = None

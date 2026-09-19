@@ -38,11 +38,13 @@ class SensapexBinding(BaseBinding):
             self.task_id = task_id
 
             # Start movement.
-            set_message(task_id, f"Sending movement to Sensapex {self.manipulator_id}.")
+            await set_message(
+                task_id, f"Sending movement to Sensapex {self.manipulator_id}."
+            )
             movement_event = self.device.goto_pos(
                 [axis * 1000 for axis in position], speed
             )
-            set_message(
+            await set_message(
                 task_id,
                 f"Movement sent to Sensapex {self.manipulator_id}. Waiting for completion...",
             )
@@ -52,23 +54,25 @@ class SensapexBinding(BaseBinding):
 
             # Set message based on end state.
             if not movement_event.reached_target():
-                set_message(
+                await set_message(
                     task_id, f"Sensapex {self.manipulator_id} DID NOT reach target."
                 )
             elif movement_event.interrupted:
-                set_message(
+                await set_message(
                     task_id, f"Sensapex {self.manipulator_id} movement INTERRUPTED."
                 )
             else:
-                set_message(
+                await set_message(
                     task_id, f"Sensapex {self.manipulator_id} movement FINISHED."
                 )
         except Exception as e:
-            set_message(task_id, f"Sensapex {self.manipulator_id} movement failed: {e}")
+            await set_message(
+                task_id, f"Sensapex {self.manipulator_id} movement failed: {e}"
+            )
         finally:
             # Remove manipulator and then end task if there are no more manipulators on it.
-            if remove_manipulator(task_id, "sensapex", self.manipulator_id):
-                end_task(task_id, "Completed")
+            if await remove_manipulator(task_id, "sensapex", self.manipulator_id):
+                await end_task(task_id, "Completed")
 
             # Remove task from manipulator.
             self.task_id = None
