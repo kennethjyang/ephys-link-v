@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Coroutine
+from typing import Any
 
 import pytest
 
@@ -6,7 +8,7 @@ from ephys_link import tasks as tasks_module
 from ephys_link.models import TaskState
 
 
-def run(coro):
+def run[T](coro: Coroutine[Any, Any, T]) -> T:
     """Drive a single coroutine to completion without pytest-asyncio."""
     return asyncio.run(coro)
 
@@ -28,7 +30,9 @@ def test_get_task_missing_returns_none():
 def test_get_task_returns_existing():
     tasks_module.tasks["t1"] = TaskState(manipulators={("fake", "0")})
 
-    assert run(tasks_module.get_task("t1")).manipulators == {("fake", "0")}
+    task = run(tasks_module.get_task("t1"))
+    assert task is not None
+    assert task.manipulators == {("fake", "0")}
 
 
 # delete_task

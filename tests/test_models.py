@@ -39,9 +39,9 @@ def test_manipulator_info_rejects_equal_range_bounds():
 
 
 @pytest.mark.parametrize("field", ["make", "model", "id"])
-def test_manipulator_info_rejects_empty_identifier(field):
+def test_manipulator_info_rejects_empty_identifier(field: str):
     with pytest.raises(ValidationError):
-        ManipulatorInfo(**{field: "", "make": "fake", "model": "Fake", "id": "0"})
+        ManipulatorInfo(**{field: "", "make": "fake", "model": "Fake", "id": "0"})  # type: ignore[bad-argument-type]
 
 
 def test_manipulator_info_rejects_no_axis_limits():
@@ -75,7 +75,7 @@ def test_manipulator_state_response_accepts_extra_fields():
     response = ManipulatorStateResponse(position=[1.0, 2.0], temperature=20)
     assert response.position == [1.0, 2.0]
     assert response.active_task_id is None
-    assert response.temperature == 20
+    assert response.temperature == 20  # type: ignore[missing-attribute]
 
 
 def test_manipulator_state_response_rejects_empty_position():
@@ -93,7 +93,7 @@ def test_set_position_payload_accepts_positive_speed():
 
 def test_set_position_payload_rejects_non_positive_speed():
     with pytest.raises(ValidationError):
-        SetPositionPayload(position=[0.0], speed=0)
+        SetPositionPayload(position=[0.0], speed=0)  # type: ignore[bad-argument-type]
 
 
 def test_set_position_payload_rejects_empty_position():

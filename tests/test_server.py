@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,6 +13,8 @@ client = TestClient(app)
 
 
 class FakeBinding:
+    jackhammer: Any = None
+
     def __init__(
         self,
         task_id: str | None = None,
@@ -80,7 +84,7 @@ def clean_pool():
 
 
 def install(make: str, manipulator_id: str, binding: FakeBinding) -> FakeBinding:
-    manipulators[make][manipulator_id] = binding
+    manipulators[make][manipulator_id] = binding  # type: ignore[unsupported-operation]
     return binding
 
 
@@ -108,12 +112,12 @@ def test_root_returns_server_version():
 # GET /find
 
 
-def test_find_with_no_devices(monkeypatch):
+def test_find_with_no_devices(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(manipulators_module, "UMP", _EmptyUmpClass)
     monkeypatch.setattr(
         manipulators_module,
         "SensapexBinding",
-        lambda manipulator_id: FakeBinding(),
+        lambda manipulator_id: FakeBinding(),  # type: ignore[implicit-any-lambda]
     )
 
     response = client.get("/find")
@@ -329,7 +333,7 @@ def test_set_positions_failure_503():
 
 def test_custom_calls_callable_and_creates_task():
     binding = install("fake", "0", FakeBinding())
-    binding.jackhammer = lambda **kwargs: None
+    binding.jackhammer = lambda **kwargs: None  # type: ignore[implicit-any-lambda]
 
     response = client.put("/custom/fake/0", json={"name": "jackhammer", "kwargs": {}})
     assert response.status_code == 200
