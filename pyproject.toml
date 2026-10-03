@@ -5,10 +5,10 @@ description = "Electrophysiology manipulator communication platform."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi[standard]==0.141.1",
+    "fastapi[standard]==0.142.2",
     "pydantic==2.13.5",
     "sensapex==1.504.3",
-    "uvicorn==0.53.0",
+    "uvicorn==0.54.0",
 ]
 
 [tool.uv]
@@ -34,10 +34,10 @@ preset = "strict"
 
 [dependency-groups]
 dev = [
-    "lefthook>=2.1.14",
-    "pyrefly>=1.3.1",
+    "lefthook>=2.1.15",
+    "pyrefly>=1.3.2",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "pytest-mock>=3.15.1",
-    "ruff>=0.16.8",
+    "pytest-mock>=3.16.0",
+    "ruff>=0.16.9",
 ]
