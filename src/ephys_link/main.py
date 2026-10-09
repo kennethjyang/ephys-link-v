@@ -12,7 +12,12 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-# Launch.
-if __name__ == "__main__":
+
+def main():
     find_manipulators()
     run(app, host="0.0.0.0", port=args.port)
+
+
+# Launch.
+if __name__ == "__main__":
+    main()

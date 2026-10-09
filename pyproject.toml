@@ -1,8 +1,11 @@
 [project]
 name = "ephys-link"
-version = "5.1.0.dev1"
+version = "5.1.0.dev2"
 description = "Electrophysiology manipulator communication platform."
 readme = "README.md"
+authors = [
+    { name = "Kenneth Yang", email = "kenneth.yang@is88.com" }
+]
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard]==0.142.2",
@@ -11,11 +14,14 @@ dependencies = [
     "uvicorn==0.54.0",
 ]
 
-[tool.uv]
-package = false
+[project.scripts]
+el = "ephys_link.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -30,7 +36,6 @@ project-includes = [
     "**/*.ipynb",
 ]
 preset = "strict"
-
 
 [dependency-groups]
 dev = [

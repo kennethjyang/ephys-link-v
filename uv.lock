@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -265,8 +265,8 @@ wheels = [
 
 [[package]]
 name = "ephys-link"
-version = "5.1.0.dev1"
-source = { virtual = "." }
+version = "5.1.0.dev2"
+source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "pydantic" },
