@@ -15,7 +15,7 @@ def main(
     num_fake_manipulators: Annotated[
         int,
         typer.Option(
-            "--num-fake-manipulators", help="Number of fake manipulators to spawn"
+            "-f", "--num-fake-manipulators", help="Number of fake manipulators to spawn"
         ),
     ] = 0,
 ) -> None:
