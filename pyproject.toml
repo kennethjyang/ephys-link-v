@@ -40,6 +40,7 @@ preset = "strict"
 [dependency-groups]
 dev = [
     "lefthook>=2.1.15",
+    "pyinstaller>=6.22.3",
     "pyrefly>=1.3.2",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
