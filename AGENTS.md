@@ -1,4 +1,9 @@
-# Python imports
+# Implementation Rules
+- Use the Typer skill when implementing the CLI.
+- Use the FastAPI skill when editing the server.
+- Use uv, never pip.
+
+# Python Imports
 
 - Prefer absolute imports rooted at the package name. Allow single-dot
   relative imports within a subpackage when clearer.
