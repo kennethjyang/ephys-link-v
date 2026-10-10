@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-el = "ephys_link.main:main"
+el = "ephys_link.main:app"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

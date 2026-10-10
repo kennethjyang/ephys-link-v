@@ -7,9 +7,9 @@ from ephys_link import manipulators as manipulators_module
 from ephys_link import tasks as tasks_module
 from ephys_link.manipulators import manipulators
 from ephys_link.models import ManipulatorInfo, ManipulatorStateResponse, TaskState
-from ephys_link.server import app
+from ephys_link.server import server
 
-client = TestClient(app)
+client = TestClient(server)
 
 
 class FakeBinding:

@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
 
+from typer import Typer
 from uvicorn import run
 
 from ephys_link.manipulators import find_manipulators
-from ephys_link.server import app
+from ephys_link.server import server
 
 # Parse CLI.
 parser = ArgumentParser()
@@ -12,12 +13,15 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+app = Typer()
 
+
+@app.command()
 def main():
     find_manipulators()
-    run(app, host="0.0.0.0", port=args.port)
+    run(server, host="0.0.0.0", port=args.port)
 
 
 # Launch.
 if __name__ == "__main__":
-    main()
+    app()
