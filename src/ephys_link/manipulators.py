@@ -3,6 +3,7 @@ from collections import defaultdict
 from sensapex import UMP
 
 from ephys_link.base_binding import BaseBinding
+from ephys_link.bindings.fake_binding import FakeBinding
 from ephys_link.bindings.sensapex_binding import SensapexBinding
 
 # Mapping of detected manipulators at startup.
@@ -11,7 +12,9 @@ from ephys_link.bindings.sensapex_binding import SensapexBinding
 manipulators: defaultdict[str, dict[str, BaseBinding]] = defaultdict(dict)
 
 
-def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
+def find_manipulators(
+    num_fake_manipulators: int = 0,
+) -> dict[str, dict[str, BaseBinding]]:
     """Search across binding interfaces for manipulators and return them."""
 
     # Reset bindings.
@@ -26,8 +29,8 @@ def find_manipulators() -> dict[str, dict[str, BaseBinding]]:
             str(manipulator_id)
         )
 
-    # Fake bindings (uncomment to use).
-    # manipulators["fake"]["0"] = FakeBinding("0")
-    # manipulators["fake"]["1"] = FakeBinding("1")
+    # Fake bindings.
+    for i in range(num_fake_manipulators):
+        manipulators["fake"][str(i)] = FakeBinding(str(i))
 
     return manipulators

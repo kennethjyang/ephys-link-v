@@ -18,8 +18,8 @@ from ephys_link.models import (
 from ephys_link.tasks import delete_task, end_task, get_task, remove_manipulator, tasks
 
 # Configure API server.
-app = FastAPI()
-app.add_middleware(
+server = FastAPI()
+server.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
@@ -28,7 +28,7 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@server.get("/")
 def server_state() -> ServerStateResponse:
     """Return the server state and known manipulators."""
     return ServerStateResponse(
@@ -41,14 +41,14 @@ def server_state() -> ServerStateResponse:
     )
 
 
-@app.get("/find")
+@server.get("/find")
 def find() -> ServerStateResponse:
     """Prompt the server to find manipulators again and return the server state."""
     find_manipulators()
     return server_state()
 
 
-@app.get("/state/{make}/{manipulator_id}")
+@server.get("/state/{make}/{manipulator_id}")
 async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateResponse:
     """Query the state of a manipulator.
 
@@ -71,7 +71,7 @@ async def manipulator_state(make: str, manipulator_id: str) -> ManipulatorStateR
         )
 
 
-@app.get("/states")
+@server.get("/states")
 async def manipulator_states(
     manipulators_requested: Annotated[
         list[str], Query(alias="manipulator", min_length=1)
@@ -103,7 +103,7 @@ async def manipulator_states(
     return dict(response)
 
 
-@app.get("/task/{task_id}")
+@server.get("/task/{task_id}")
 async def task_state(task_id: str) -> TaskState:
     """Retrieves the state of a task.
 
@@ -132,7 +132,7 @@ async def task_state(task_id: str) -> TaskState:
         )
 
 
-@app.put("/stop-manipulator/{make}/{manipulator_id}")
+@server.put("/stop-manipulator/{make}/{manipulator_id}")
 async def stop_manipulator(make: str, manipulator_id: str):
     """Stops a manipulator and updates associated task.
     Args:
@@ -174,7 +174,7 @@ async def stop_manipulator(make: str, manipulator_id: str):
         )
 
 
-@app.put("/stop-task/{task_id}")
+@server.put("/stop-task/{task_id}")
 async def stop_task(task_id: str):
     """Stops all manipulators in a task.
 
@@ -198,7 +198,7 @@ async def stop_task(task_id: str):
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found.")
 
 
-@app.put("/stop-all")
+@server.put("/stop-all")
 async def stop_all():
     """Stops all tasks.
 
@@ -209,7 +209,7 @@ async def stop_all():
         await stop_task(task_id)
 
 
-@app.put("/set-position/{make}/{manipulator_id}")
+@server.put("/set-position/{make}/{manipulator_id}")
 async def set_position(
     make: str,
     manipulator_id: str,
@@ -256,7 +256,7 @@ async def set_position(
         raise HTTPException(status_code=503, detail=f"Unable to set position: {e}")
 
 
-@app.put("/set-positions")
+@server.put("/set-positions")
 async def set_positions(
     payload: dict[str, dict[str, SetPositionPayload]],
     background_task: BackgroundTasks,
@@ -308,7 +308,7 @@ async def set_positions(
     return TaskCreationResponse(task_id=task_id)
 
 
-@app.put("/custom/{make}/{manipulator_id}")
+@server.put("/custom/{make}/{manipulator_id}")
 async def custom(
     make: str,
     manipulator_id: str,

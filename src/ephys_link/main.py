@@ -1,23 +1,29 @@
-from argparse import ArgumentParser
+from typing import Annotated
 
+import typer
 from uvicorn import run
 
 from ephys_link.manipulators import find_manipulators
-from ephys_link.server import app
+from ephys_link.server import server
 
-# Parse CLI.
-parser = ArgumentParser()
-parser.add_argument(
-    "-p", "--port", type=int, default=8000, help="Server port (default: 8000)"
-)
-args = parser.parse_args()
+app = typer.Typer()
 
 
-def main():
-    find_manipulators()
-    run(app, host="0.0.0.0", port=args.port)
+@app.command()
+def main(
+    port: Annotated[int, typer.Option("-p", "--port", help="Server port")] = 8000,
+    num_fake_manipulators: Annotated[
+        int,
+        typer.Option(
+            "-f", "--num-fake-manipulators", help="Number of fake manipulators to spawn"
+        ),
+    ] = 0,
+) -> None:
+    """Launch the ephys-link server."""
+    find_manipulators(num_fake_manipulators)
+    run(server, host="0.0.0.0", port=port)
 
 
 # Launch.
 if __name__ == "__main__":
-    main()
+    app()
