@@ -1,3 +1,4 @@
+import sys
 from collections import defaultdict
 
 from sensapex import UMP
@@ -20,14 +21,15 @@ def find_manipulators(
     # Reset bindings.
     manipulators.clear()
 
-    # Sensapex.
-    ump = UMP.get_ump()
-    found_manipulators = ump.list_devices()
+    # Sensapex — not available on macOS.
+    if sys.platform != "darwin":
+        ump = UMP.get_ump()
+        found_manipulators = ump.list_devices()
 
-    for manipulator_id in found_manipulators:
-        manipulators["sensapex"][str(manipulator_id)] = SensapexBinding(
-            str(manipulator_id)
-        )
+        for manipulator_id in found_manipulators:
+            manipulators["sensapex"][str(manipulator_id)] = SensapexBinding(
+                str(manipulator_id)
+            )
 
     # Fake bindings.
     for i in range(num_fake_manipulators):

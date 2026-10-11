@@ -26,6 +26,9 @@ def test_find_manipulators_updates_pool_by_value(monkeypatch: MonkeyPatch) -> No
     monkeypatch.setattr(manipulators, "UMP", _FakeUmpClass)
     monkeypatch.setattr(manipulators, "SensapexBinding", _FakeBinding)
 
+    # Bypass the macOS guard so the sensapex path runs.
+    monkeypatch.setattr(manipulators.sys, "platform", "linux")
+
     # Hold the pool the way server.py does, before discovery runs.
     manipulators.manipulators.clear()
     pool = manipulators.manipulators
