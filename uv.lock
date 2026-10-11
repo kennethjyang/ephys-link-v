@@ -278,6 +278,7 @@ version = "5.1.0.dev2"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "httpx" },
     { name = "pydantic" },
     { name = "sensapex" },
     { name = "typer" },
@@ -298,6 +299,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = "==0.142.2" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = "==2.13.5" },
     { name = "sensapex", specifier = "==1.504.3" },
     { name = "typer", specifier = ">=0.27.2" },
