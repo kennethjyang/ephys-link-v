@@ -24,6 +24,10 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+    "ignore:.*The anyio.abc.BlockingPortal alias:DeprecationWarning",
+]
 
 [tool.ruff]
 fix = true
