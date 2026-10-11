@@ -1,8 +1,11 @@
 import sys
 from collections import defaultdict
 
+from sensapex import UMP
+
 from ephys_link.base_binding import BaseBinding
 from ephys_link.bindings.fake_binding import FakeBinding
+from ephys_link.bindings.sensapex_binding import SensapexBinding
 
 # Mapping of detected manipulators at startup.
 # Make -> ID -> Binding.
@@ -20,10 +23,6 @@ def find_manipulators(
 
     # Sensapex — not available on macOS.
     if sys.platform != "darwin":
-        from sensapex import UMP
-
-        from ephys_link.bindings.sensapex_binding import SensapexBinding
-
         ump = UMP.get_ump()
         found_manipulators = ump.list_devices()
 
