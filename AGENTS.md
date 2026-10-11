@@ -2,6 +2,9 @@
 - Use the Typer skill when implementing the CLI.
 - Use the FastAPI skill when editing the server.
 - Use uv, never pip.
+- Commit and push frequently while working.
+- Always update unit tests after changes to the code.
+- Always add coverage-guided unit tests to new features. Aim for good coverage of branches, but no need to force 100% coverage.
 
 # Python Imports
 

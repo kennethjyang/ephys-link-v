@@ -1,10 +1,12 @@
 import sys
 from collections import defaultdict
 
+import httpx
 from sensapex import UMP
 
 from ephys_link.base_binding import BaseBinding
 from ephys_link.bindings.fake_binding import FakeBinding
+from ephys_link.bindings.mpm_binding import MPMBinding
 from ephys_link.bindings.sensapex_binding import SensapexBinding
 
 # Mapping of detected manipulators at startup.
@@ -30,6 +32,18 @@ def find_manipulators(
             manipulators["sensapex"][str(manipulator_id)] = SensapexBinding(
                 str(manipulator_id)
             )
+
+    # MPM — optional, skip if server unreachable.
+    try:
+        resp = httpx.get("http://localhost:8080/", timeout=2.0)
+        resp.raise_for_status()
+        data = resp.json()
+        for probe in data.get("ProbeArray", []):
+            manipulators["new-scale-mpm"][probe["Id"]] = MPMBinding(
+                probe["Id"], port=8080
+            )
+    except Exception:  # noqa: S110
+        pass
 
     # Fake bindings.
     for i in range(num_fake_manipulators):
